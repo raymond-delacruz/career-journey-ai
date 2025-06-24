@@ -2206,13 +2206,13 @@ function VoicePracticeMode({
     
     // Find the selected scenario to guide the conversation
     const selectedScenario = scenarios.find(s => s.title === voiceScenario)
-    const conversationTurn = conversationHistory.filter(h => h.speaker === 'user').length
-    
+    const conversationTurn = conversationHistory.filter(h => h.speaker === 'user').length - 1
+    console.log('DEBUG: conversationTurn =', conversationTurn, 'userMessages =', conversationHistory.filter(h => h.speaker === 'user').length)    
     // Generate scenario-specific responses based on the selected practice scenario
     if (selectedScenario) {
       switch (selectedScenario.id) {
         case 'total_compensation':
-          if (conversationTurn === 1) {
+          if (conversationTurn === 0) {
             // First response - acknowledge their total comp focus and explore priorities
             if (messageLower.includes('salary') || messageLower.includes('base')) {
               response = `I understand base salary is important to you. Let's look at the complete picture though - our total compensation includes base salary, performance bonus potential, and equity participation. What's your thinking on how you'd like to see these components balanced? Are you looking for more guaranteed cash compensation or interested in upside potential?`
@@ -2223,7 +2223,7 @@ function VoicePracticeMode({
             } else {
               response = `I appreciate you taking a holistic view of compensation. Let's break down what's most important to you. Are you primarily focused on maximizing the guaranteed components like base and signing bonus, or are you interested in upside potential through performance bonuses and equity?`
             }
-          } else if (conversationTurn === 2) {
+          } else if (conversationTurn === 1) {
             // Second response - negotiate specific components
             response = `Based on what you've shared, I think we can work with that. I'm thinking we could increase the base salary by 8-10%, add a $15,000 signing bonus, and bump up the equity to 0.25%. That brings the total package value up significantly. How does that balance feel to you?`
           } else {
@@ -2233,7 +2233,7 @@ function VoicePracticeMode({
           break;
 
         case 'benefits':
-          if (conversationTurn === 1) {
+          if (conversationTurn === 0) {
             // First response - explore benefits priorities
             if (messageLower.includes('health') || messageLower.includes('medical')) {
               response = `Healthcare is definitely a priority. Our standard plan covers 90% of premiums, but I understand family coverage can be expensive. Are you looking at family coverage, or are there specific healthcare needs we should consider? We also have options for HSA contributions and wellness programs.`
@@ -2246,7 +2246,7 @@ function VoicePracticeMode({
             } else {
               response = `Benefits can really make a difference in your overall experience. What aspects of our benefits package are most important to you and your family? Health coverage, retirement planning, time off, professional development - help me understand your priorities so I can see where we have flexibility.`
             }
-          } else if (conversationTurn === 2) {
+          } else if (conversationTurn === 1) {
             // Second response - offer specific enhancements
             response = `That makes perfect sense. Here's what I can do: I'll upgrade you to our premium health plan with full family coverage, increase the 401k match to 6%, add an extra week of PTO, and set up a $4,000 annual professional development budget. How does that enhanced benefits package sound?`
           } else {
@@ -2256,7 +2256,7 @@ function VoicePracticeMode({
           break;
 
         case 'general_practice':
-          if (conversationTurn === 1) {
+          if (conversationTurn === 0) {
             // First response - open-ended, let user drive the conversation
             if (messageLower.includes('salary') || messageLower.includes('compensation') || messageLower.includes('pay')) {
               response = `Absolutely, let's talk compensation. I want to make sure we're competitive and fair. What aspects of the compensation package are you hoping to discuss? Are you looking at base salary, bonus potential, equity, or the overall package structure?`
@@ -2269,7 +2269,7 @@ function VoicePracticeMode({
             } else {
               response = `I appreciate you being thoughtful about this decision. What's the most important factor for you in making this work? Whether it's compensation, benefits, work arrangements, or timeline - let's focus on what matters most to you first.`
             }
-          } else if (conversationTurn === 2) {
+          } else if (conversationTurn === 1) {
             // Second response - be flexible and collaborative
             response = `I really appreciate how you've approached this conversation. Based on what you've shared, I think I can work with most of what you're asking for. Let me see what I can do on the key points you've raised. I want to find a solution that works well for both of us.`
           } else {
