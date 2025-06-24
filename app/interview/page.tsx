@@ -287,7 +287,7 @@ export default function InterviewPage() {
         }
       }
 
-      return {
+          return {
         level: levelContext[level as keyof typeof levelContext] || levelContext['Mid Level (3-5 years)'],
         role: roleSpecifics[jobTitle as keyof typeof roleSpecifics] || {
           coreSkills: 'role-specific technical and soft skills',
@@ -460,12 +460,12 @@ export default function InterviewPage() {
     // Add Product Manager specific case study questions
     if (jobTitle === 'Product Manager' && stage === 'Case Study') {
       baseQuestions['Case Study'] = [
-        { id: 1, text: `I'll present a product challenge typical of ${context.role.role.context} companies. How would you approach prioritizing features given ${context.role.role.focus}?`, category: 'Product Strategy' },
-        { id: 2, text: `How would you design and execute user research to validate assumptions in a ${context.role.role.context} environment?`, category: 'User Research' },
-        { id: 3, text: `What metrics would you track to measure product success given the ${context.level.challenges} of ${context.role.role.context} companies?`, category: 'Product Metrics' },
-        { id: 4, text: `How would you work with engineering and design teams to deliver on ${context.role.role.focus} in a ${context.role.role.context} setting?`, category: 'Cross-functional Leadership' },
-        { id: 5, text: `Design a go-to-market strategy for a new feature, considering the ${context.level.challenges} typical of ${context.role.role.context} environments.`, category: 'Go-to-Market' },
-        { id: 6, text: `How would you handle competing stakeholder priorities while maintaining focus on ${context.role.role.focus} in a ${context.role.role.context}?`, category: 'Stakeholder Management' }
+        { id: 1, text: `I'll present a product challenge typical of ${jobTitle} companies. How would you approach prioritizing features given ${context.role.keyResponsibilities}?`, category: 'Product Strategy' },
+        { id: 2, text: `How would you design and execute user research to validate assumptions in a ${jobTitle} environment, using your experience with ${context.role.tools}?`, category: 'User Research' },
+        { id: 3, text: `What metrics would you track to measure product success given the ${context.level.challenges} of ${jobTitle} roles?`, category: 'Product Metrics' },
+        { id: 4, text: `How would you work with engineering and design teams to deliver on ${context.role.keyResponsibilities} as a ${level} ${jobTitle}?`, category: 'Cross-functional Leadership' },
+        { id: 5, text: `Design a go-to-market strategy for a new feature, considering the ${context.level.challenges} typical of ${level} ${jobTitle} roles.`, category: 'Go-to-Market' },
+        { id: 6, text: `How would you handle competing stakeholder priorities while maintaining focus on ${context.role.keyResponsibilities} as a ${jobTitle}?`, category: 'Stakeholder Management' }
       ]
     }
 
@@ -532,7 +532,7 @@ export default function InterviewPage() {
           setCurrentSqlCode(previousEntry.sqlCode)
         }
         console.log('📝 Restored previous answer:', previousEntry.answer.substring(0, 50) + '...')
-      } else {
+            } else {
         setCurrentAnswer('')
         setCurrentSqlCode('')
         console.log('🧹 No previous answer found, cleared inputs')
@@ -772,8 +772,8 @@ export default function InterviewPage() {
       startQuestionTimer()
       
       // Reset processing flag after state updates complete
-      setTimeout(() => {
-        isProcessingAnswerRef.current = false
+                        setTimeout(() => {
+                          isProcessingAnswerRef.current = false
         setIsProcessingAnswer(false)
         currentTransactionId.current = null
         console.log('🔓 Cleared processing flag after successful transition for transaction:', transactionId)
@@ -983,7 +983,7 @@ export default function InterviewPage() {
       } catch (error) {
         console.error('❌ Error starting recognition:', error)
         setIsListening(false)
-    setIsRecording(false)
+      setIsRecording(false)
     }
     } else {
       console.error('❌ Speech recognition not supported')
@@ -1175,7 +1175,7 @@ export default function InterviewPage() {
                 {transcript.map((entry, index) => (
                   <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
                     <div className="flex justify-between items-start mb-2">
-                      <p className="font-medium text-gray-800">{entry.question}</p>
+                    <p className="font-medium text-gray-800">{entry.question}</p>
                       {entry.timeSpent && (
                         <div className="flex items-center space-x-1 text-sm text-gray-500 flex-shrink-0 ml-4">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1270,8 +1270,8 @@ export default function InterviewPage() {
                         </div>
                         
                         {renderFormattedFeedback(feedback)}
+                        </div>
                       </div>
-                    </div>
                   </div>
                 ) : (
                   <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-8 rounded-2xl border border-gray-200 shadow-lg">
@@ -1378,9 +1378,9 @@ export default function InterviewPage() {
               <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-800">
-                      Question {questionIndex + 1} of {questions.length}
-                    </h2>
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    Question {questionIndex + 1} of {questions.length}
+                  </h2>
                     {/* Timer Display */}
                     <div className="flex items-center space-x-4 mt-2">
                       <div className="flex items-center space-x-2 text-sm">
@@ -1424,52 +1424,52 @@ export default function InterviewPage() {
                   <div className="space-y-4">
                     {/* Navigation Controls for SQL Test */}
                     <div className="bg-gray-50 px-6 py-4 rounded-lg border border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={goToPreviousQuestion}
-                            disabled={questionIndex === 0 || isProcessingAnswer}
-                            className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                            </svg>
-                            <span>Previous</span>
-                          </button>
-                          
-                          <div className="text-sm text-gray-600">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={goToPreviousQuestion}
+                        disabled={questionIndex === 0 || isProcessingAnswer}
+                        className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        <span>Previous</span>
+                      </button>
+                      
+                      <div className="text-sm text-gray-600">
                             {questionIndex === 0 && "First SQL question"}
-                            {questionIndex > 0 && questionIndex < questions.length - 1 && "Navigate freely"}
+                        {questionIndex > 0 && questionIndex < questions.length - 1 && "Navigate freely"}
                             {questionIndex === questions.length - 1 && "Last SQL question"}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={skipCurrentQuestion}
-                            disabled={isProcessingAnswer}
-                            className="flex items-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                            <span>Skip Question</span>
-                          </button>
-                          
-                          <button
-                            onClick={goToNextQuestion}
-                            disabled={questionIndex >= questions.length - 1 || isProcessingAnswer}
-                            className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          >
-                            <span>Next Question</span>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        </div>
                       </div>
                     </div>
-
+                    
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={skipCurrentQuestion}
+                        disabled={isProcessingAnswer}
+                        className="flex items-center space-x-2 bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                            <span>Skip Question</span>
+                      </button>
+                      
+                      <button
+                        onClick={goToNextQuestion}
+                        disabled={questionIndex >= questions.length - 1 || isProcessingAnswer}
+                        className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                            <span>Next Question</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
                     {/* Question Text */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                       <h3 className="text-lg font-semibold text-blue-800 mb-2">💭 SQL Question</h3>
@@ -1480,7 +1480,7 @@ export default function InterviewPage() {
                     {currentQuestion?.tableSchema && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                         <h3 className="text-lg font-semibold text-blue-800 mb-3">📊 Table Schemas</h3>
-                        <div className="space-y-4">
+                  <div className="space-y-4">
                           {currentQuestion.tableSchema.tables.map((table, tableIndex) => (
                             <div key={tableIndex} className="bg-white border border-blue-200 rounded-lg p-4">
                               <h4 className="text-md font-bold text-blue-700 mb-2">{table.name}</h4>
@@ -1569,16 +1569,16 @@ WHERE ..."
                     </div>
                     
                     <div className="flex items-center justify-between">
-                      <button
-                        onClick={handleSqlSubmit}
-                        disabled={!currentSqlCode.trim()}
+                    <button
+                      onClick={handleSqlSubmit}
+                      disabled={!currentSqlCode.trim()}
                         className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
-                      >
+                    >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                         <span>Submit SQL Answer</span>
-                      </button>
+                    </button>
                       
                       {/* Quick navigation buttons */}
                       <div className="flex items-center space-x-2">
@@ -1657,14 +1657,14 @@ WHERE ..."
 
                       {/* AI Interview Coach Content */}
                       <div className="p-6">
-                        <InterviewBot
-                          room={liveKitRoom}
-                          currentQuestion={currentQuestion}
-                          isConnected={isLiveKitConnected}
-                          isInterviewStarted={isInterviewStarted}
-                          onBotDoneSpeaking={handleBotDoneSpeaking}
-                          onBotStartedSpeaking={handleBotStartedSpeaking}
-                        />
+                <InterviewBot
+                  room={liveKitRoom}
+                  currentQuestion={currentQuestion}
+                  isConnected={isLiveKitConnected}
+                  isInterviewStarted={isInterviewStarted}
+                  onBotDoneSpeaking={handleBotDoneSpeaking}
+                      onBotStartedSpeaking={handleBotStartedSpeaking}
+                    />
                       </div>
                     </div>
 
@@ -1677,8 +1677,8 @@ WHERE ..."
                             <div className="flex items-center text-yellow-600">
                               <div className="w-3 h-3 bg-yellow-400 rounded-full mr-2 animate-pulse"></div>
                               <span className="text-sm font-medium">Preparing to listen...</span>
-                            </div>
-                          )}
+              </div>
+            )}
                           {isListening && !isRecording && (
                             <div className="flex items-center text-blue-600">
                               <div className="w-3 h-3 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
