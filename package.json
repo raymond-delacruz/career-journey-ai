@@ -1,7 +1,7 @@
 {
-  "name": "interview-coach-ai",
+  "name": "career-journey-ai",
   "version": "1.0.0",
-  "description": "AI-powered interview coaching application with real-time voice interaction",
+  "description": "AI-powered career coaching application with interview practice and negotiation training",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
