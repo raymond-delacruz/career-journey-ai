@@ -2194,20 +2194,23 @@ function VoicePracticeMode({
     setConversationHistory(prev => [...prev, userResponse])
     setCurrentResponse('')
     
+    // Calculate the conversation turn based on current state + 1 for the new user message
+    const currentUserTurnCount = conversationHistory.filter(h => h.speaker === 'user').length + 1
+    
     // Generate AI response based on negotiation focus and analysis
     setTimeout(() => {
-      generateEnhancedHiringManagerResponse(userMessage, turnDuration)
+      generateEnhancedHiringManagerResponse(userMessage, turnDuration, currentUserTurnCount)
     }, 1500)
   }
 
-  const generateEnhancedHiringManagerResponse = (userMessage: string, userTurnDuration: number) => {
+  const generateEnhancedHiringManagerResponse = (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
     let response = ''
     const messageLower = userMessage.toLowerCase()
     
     // Find the selected scenario to guide the conversation
     const selectedScenario = scenarios.find(s => s.title === voiceScenario)
-    const conversationTurn = conversationHistory.filter(h => h.speaker === 'user').length - 1
-    console.log('DEBUG: conversationTurn =', conversationTurn, 'userMessages =', conversationHistory.filter(h => h.speaker === 'user').length)    
+    const conversationTurn = userTurnCount - 1  // 0-indexed for first turn
+    console.log('DEBUG: conversationTurn =', conversationTurn, 'userTurnCount =', userTurnCount)
     // Generate scenario-specific responses based on the selected practice scenario
     if (selectedScenario) {
       switch (selectedScenario.id) {
