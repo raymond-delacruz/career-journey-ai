@@ -137,7 +137,12 @@ export function InterviewBot({ room, currentQuestion, isConnected, isInterviewSt
         setIsLoading(false)
         setIsSpeaking(false)
         setError(error.toString())
-        onBotDoneSpeaking()
+        
+        // Fallback: Continue interview in text-only mode
+        console.log('🔇 TTS failed, continuing in text-only mode')
+        setTimeout(() => {
+          onBotDoneSpeaking()
+        }, 500)
       }
     })
   }
@@ -203,7 +208,7 @@ export function InterviewBot({ room, currentQuestion, isConnected, isInterviewSt
   };
 
   const getStatusText = () => {
-    if (error) return `Error: ${error}`
+    if (error) return 'Text Mode (Voice Unavailable)'
     if (isLoading) return 'Generating speech...'
     if (isSpeaking) return 'Speaking...'
     switch (connectionStatus) {
@@ -248,9 +253,12 @@ export function InterviewBot({ room, currentQuestion, isConnected, isInterviewSt
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-sm text-red-700">
-              Failed to generate speech. Ensure your OpenAI API key is configured correctly.
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-sm text-yellow-800 font-medium mb-1">
+              🔇 Voice disabled - continuing in text mode
+            </p>
+            <p className="text-xs text-yellow-700">
+              Voice synthesis is unavailable. You can still read the questions and respond normally.
             </p>
           </div>
         )}
