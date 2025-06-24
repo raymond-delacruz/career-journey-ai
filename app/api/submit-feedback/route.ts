@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     console.log('🔗 Testing Supabase connection...')
     const { data: testData, error: testError } = await supabaseAdmin
       .from('feedbacks')
-      .select('count(*)')
+      .select('id')
       .limit(1)
 
     if (testError) {
