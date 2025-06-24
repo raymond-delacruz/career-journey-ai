@@ -45,8 +45,23 @@ export function useOpenAITTS() {
           throw new Error('Failed to generate speech. Ensure your OpenAI API key is configured correctly.')
         }
 
+        // Check if response is JSON (error) or audio blob
+        const contentType = response.headers.get('content-type')
+        
+        if (contentType && contentType.includes('application/json')) {
+          // Handle JSON error response
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'TTS service not available')
+        }
+
         // Create blob URL from audio data
         const audioBlob = await response.blob()
+        
+        // Validate audio blob size
+        if (audioBlob.size < 1000) {
+          throw new Error('Invalid audio data received - blob too small')
+        }
+        
         audioUrl = URL.createObjectURL(audioBlob)
         
         // Cache the audio URL

@@ -17,20 +17,14 @@ export async function POST(request: NextRequest) {
     console.log('OpenAI API Key length:', openaiApiKey?.length || 0)
     
     if (!openaiApiKey || openaiApiKey === '' || openaiApiKey === 'your_openai_api_key_here') {
-      // Return a mock response when OpenAI API key is not configured
-      // This allows the app to work without real TTS functionality
-      console.log('OpenAI API key not configured, returning mock TTS response')
+      // Return a JSON response indicating no TTS available instead of mock audio
+      console.log('OpenAI API key not configured, returning no-TTS response')
       
-      // Create a minimal MP3 buffer (silence)
-      const mockAudioBuffer = new ArrayBuffer(1024)
-      
-      return new NextResponse(mockAudioBuffer, {
-        status: 200, // Always return 200 for audio responses
-        headers: {
-          'Content-Type': 'audio/mpeg',
-          'Content-Length': mockAudioBuffer.byteLength.toString(),
-        },
-      })
+      return NextResponse.json({ 
+        error: 'TTS_NOT_CONFIGURED',
+        message: 'OpenAI TTS is not configured. Please set OPENAI_API_KEY environment variable.',
+        fallback: true
+      }, { status: 200 })
     }
 
     console.log('Calling OpenAI TTS API with text length:', text.length)
@@ -57,15 +51,13 @@ export async function POST(request: NextRequest) {
       const errorData = await response.text()
       console.error('OpenAI TTS API error:', response.status, errorData)
       
-      // Return mock audio on API failure to keep the app working
-      const mockAudioBuffer = new ArrayBuffer(1024)
-      return new NextResponse(mockAudioBuffer, {
-        status: 200, // Always return 200 for audio responses
-        headers: {
-          'Content-Type': 'audio/mpeg',
-          'Content-Length': mockAudioBuffer.byteLength.toString(),
-        },
-      })
+      // Return JSON error instead of mock audio
+      return NextResponse.json({
+        error: 'TTS_API_ERROR',
+        message: 'OpenAI TTS API failed',
+        details: errorData,
+        fallback: true
+      }, { status: 200 })
     }
 
     // Get the audio buffer
@@ -74,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     // Return the audio as a response
     return new NextResponse(audioBuffer, {
-      status: 200, // Ensure 200 status
+      status: 200,
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuffer.byteLength.toString(),
@@ -86,14 +78,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('TTS API error:', error)
     
-    // Return mock audio on any error to keep the app working
-    const mockAudioBuffer = new ArrayBuffer(1024)
-    return new NextResponse(mockAudioBuffer, {
-      status: 200, // Always return 200 for audio responses
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': mockAudioBuffer.byteLength.toString(),
-      },
-    })
+    // Return JSON error instead of mock audio
+    return NextResponse.json({
+      error: 'TTS_INTERNAL_ERROR',
+      message: 'Internal TTS error occurred',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      fallback: true
+    }, { status: 200 })
   }
 } 
