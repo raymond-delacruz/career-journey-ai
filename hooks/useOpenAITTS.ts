@@ -42,7 +42,7 @@ export function useOpenAITTS() {
         })
 
         if (!response.ok) {
-          throw new Error('Failed to generate speech')
+          throw new Error('Failed to generate speech. Ensure your OpenAI API key is configured correctly.')
         }
 
         // Create blob URL from audio data

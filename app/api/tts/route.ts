@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       const mockAudioBuffer = new ArrayBuffer(1024)
       
       return new NextResponse(mockAudioBuffer, {
+        status: 200, // Always return 200 for audio responses
         headers: {
           'Content-Type': 'audio/mpeg',
           'Content-Length': mockAudioBuffer.byteLength.toString(),
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
       // Return mock audio on API failure to keep the app working
       const mockAudioBuffer = new ArrayBuffer(1024)
       return new NextResponse(mockAudioBuffer, {
+        status: 200, // Always return 200 for audio responses
         headers: {
           'Content-Type': 'audio/mpeg',
           'Content-Length': mockAudioBuffer.byteLength.toString(),
@@ -72,6 +74,7 @@ export async function POST(request: NextRequest) {
 
     // Return the audio as a response
     return new NextResponse(audioBuffer, {
+      status: 200, // Ensure 200 status
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuffer.byteLength.toString(),
@@ -86,6 +89,7 @@ export async function POST(request: NextRequest) {
     // Return mock audio on any error to keep the app working
     const mockAudioBuffer = new ArrayBuffer(1024)
     return new NextResponse(mockAudioBuffer, {
+      status: 200, // Always return 200 for audio responses
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': mockAudioBuffer.byteLength.toString(),
