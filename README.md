@@ -1,5 +1,9 @@
 # Career Journey AI
 
+*AI-powered career coaching application with interview practice and negotiation training*
+
+<!-- Last updated: Production deployment sync - Jan 25, 2024 -->
+
 An AI-powered interview coaching application that helps users practice their interview skills with real-time voice interaction, LiveKit audio rooms, and feedback.
 
 ## Features
@@ -124,56 +128,4 @@ docker-compose down
 \`\`\`
 
 ### Environment Variables
-\`\`\`bash
-# LiveKit Configuration
-LIVEKIT_API_KEY=devkey
-LIVEKIT_API_SECRET=secret
-NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880
-
-# Optional: OpenAI for real AI feedback
-OPENAI_API_KEY=your_openai_api_key
-\`\`\`
-
-## Current Features
-
-- ✅ LiveKit audio rooms for real-time communication
-- ✅ Speech-to-text transcription
-- ✅ Text-to-speech for questions
-- ✅ Mock AI feedback system
-- ✅ Progress tracking and interview flow
-- ✅ Responsive design
-
-## Future Enhancements
-
-- Real OpenAI integration for intelligent feedback
-- Video recording capabilities
-- Multiple interview types (technical, behavioral, etc.)
-- Interview history and progress tracking
-- Custom question sets
-- Collaborative features with mentors
-- Screen sharing for technical interviews
-
-## Troubleshooting
-
-### LiveKit Connection Issues
-1. Ensure Docker is running and LiveKit server is started
-2. Check that ports 7880, 7881, and 7882 are not in use
-3. Verify environment variables are set correctly
-4. Check browser console for WebRTC errors
-
-### Audio Issues
-1. Grant microphone permissions in your browser
-2. Check that no other applications are using your microphone
-3. Test with different browsers if issues persist
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with LiveKit server running
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details 
+\`\`
