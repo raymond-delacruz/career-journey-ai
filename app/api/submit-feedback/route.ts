@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '../../../lib/supabase'
 
 interface FeedbackRequest {
   feedback: string
@@ -22,53 +23,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Here you can:
-    // 1. Save to database
-    // 2. Send email notification
-    // 3. Send to Slack/Discord
-    // 4. Log to file
-    // 5. Send to analytics service
+    // Save feedback to Supabase database
+    const { data, error } = await supabaseAdmin
+      .from('feedbacks')
+      .insert([
+        {
+          feedback_text: feedback.trim(),
+          user_email: userEmail || null,
+          page,
+          user_agent: userAgent,
+          timestamp: new Date(timestamp)
+        }
+      ])
+      .select()
 
-    // For now, we'll log to console (you can replace this with your preferred method)
-    console.log('📝 New Feedback Received:', {
-      feedback: feedback.trim(),
+    if (error) {
+      console.error('Database error saving feedback:', error)
+      return NextResponse.json(
+        { error: 'Failed to save feedback to database' },
+        { status: 500 }
+      )
+    }
+
+    // Log successful save
+    console.log('📝 Feedback saved to database:', {
+      id: data[0]?.id,
+      feedback: feedback.trim().substring(0, 100) + '...',
       userEmail: userEmail || 'Anonymous',
       page,
-      userAgent,
-      timestamp,
-      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+      timestamp
     })
-
-    // Optional: Send email notification to yourself
-    // You could use services like:
-    // - Resend (resend.com)
-    // - SendGrid
-    // - Nodemailer
-    // - AWS SES
-    
-    // Example structure for future email implementation:
-    /*
-    const emailData = {
-      to: 'your@email.com',
-      subject: 'New Feedback - Career Journey AI',
-      text: `
-        New feedback received:
-        
-        Feedback: ${feedback}
-        User Email: ${userEmail || 'Not provided'}
-        Page: ${page}
-        Time: ${timestamp}
-        User Agent: ${userAgent}
-      `
-    }
-    
-    // await sendEmail(emailData)
-    */
 
     return NextResponse.json(
       { 
         success: true, 
-        message: 'Feedback submitted successfully' 
+        message: 'Feedback submitted successfully',
+        id: data[0]?.id
       },
       { status: 200 }
     )
