@@ -2191,16 +2191,18 @@ function VoicePracticeMode({
       duration: turnDuration
     }
     
-    setConversationHistory(prev => [...prev, userResponse])
+    setConversationHistory(prev => {
+      const newHistory = [...prev, userResponse]
+      const currentUserTurnCount = newHistory.filter(h => h.speaker === 'user').length
+      
+      // Generate AI response based on negotiation focus and analysis
+      setTimeout(() => {
+        generateEnhancedHiringManagerResponse(userMessage, turnDuration, currentUserTurnCount)
+      }, 1500)
+      
+      return newHistory
+    })
     setCurrentResponse('')
-    
-    // Calculate the conversation turn based on current state + 1 for the new user message
-    const currentUserTurnCount = conversationHistory.filter(h => h.speaker === 'user').length + 1
-    
-    // Generate AI response based on negotiation focus and analysis
-    setTimeout(() => {
-      generateEnhancedHiringManagerResponse(userMessage, turnDuration, currentUserTurnCount)
-    }, 1500)
   }
 
   const generateEnhancedHiringManagerResponse = (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
