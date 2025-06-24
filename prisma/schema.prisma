@@ -1,0 +1,226 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+// Core User model
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  name              String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Profile information
+  linkedinUrl       String?
+  currentRole       String?
+  experienceLevel   String?
+  targetRoles       String[]
+  
+  // Relations
+  interviewSessions InterviewSession[]
+  feedbacks         Feedback[]
+  events            Event[]
+  negotiationSessions NegotiationSession[]
+  resumeReviews     ResumeReview[]
+  userProgress      UserProgress[]
+  
+  @@map("users")
+}
+
+// Event tracking for analytics
+model Event {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      String   // 'interview_started', 'feedback_submitted', 'analysis_generated', etc.
+  page      String?
+  timestamp DateTime @default(now())
+  metadata  Json?    // Flexible field for event-specific data
+  
+  @@map("events")
+}
+
+// Interview Sessions
+model InterviewSession {
+  id            String     @id @default(uuid())
+  userId        String?
+  user          User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Interview configuration
+  jobTitle      String
+  level         String
+  companyStage  String?
+  stage         String     // 'Recruiter Screen', 'Technical Interview', etc.
+  duration      Int        // Duration in minutes
+  
+  // Session status
+  status        String     @default("started") // 'started', 'completed', 'abandoned'
+  startedAt     DateTime   @default(now())
+  completedAt   DateTime?
+  
+  // Results
+  overallScore  Float?
+  totalTimeSpent Int?      // Total time in seconds
+  
+  // Custom questions (if used)
+  customQuestions Json?
+  
+  // Relations
+  responses     InterviewResponse[]
+  analysis      Analysis?
+  
+  @@map("interview_sessions")
+}
+
+// Individual interview responses
+model InterviewResponse {
+  id          String           @id @default(uuid())
+  sessionId   String
+  session     InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  // Question and answer
+  questionId  Int              // Order/ID of question in the session
+  question    String
+  answer      String
+  sqlCode     String?          // For SQL test responses
+  
+  // Timing
+  timestamp   DateTime         @default(now())
+  timeSpent   Int?             // Time spent on this question in seconds
+  
+  // Analysis for this specific response
+  scores      Json?            // Individual scores for this response
+  
+  @@map("interview_responses")
+}
+
+// AI Analysis and Feedback
+model Analysis {
+  id            String           @id @default(uuid())
+  sessionId     String           @unique
+  session       InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  // Analysis content
+  feedbackText  String           // Full AI-generated feedback
+  overallScore  Float?
+  scores        Json?            // Detailed scores breakdown
+  
+  // Analysis metadata
+  analysisType  String           @default("interview") // 'interview', 'negotiation', etc.
+  modelUsed     String?          // Which AI model was used
+  createdAt     DateTime         @default(now())
+  
+  @@map("analyses")
+}
+
+// User Feedback (from feedback button)
+model Feedback {
+  id            String    @id @default(uuid())
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Feedback content
+  feedbackText  String
+  userEmail     String?
+  category      String?   // 'bug', 'suggestion', 'compliment', 'other'
+  
+  // Context
+  page          String?
+  userAgent     String?
+  sessionId     String?   // If feedback is related to a specific session
+  
+  // Status
+  status        String    @default("new") // 'new', 'reviewed', 'resolved'
+  
+  timestamp     DateTime  @default(now())
+  
+  @@map("feedbacks")
+}
+
+// Future: Negotiation Sessions
+model NegotiationSession {
+  id            String   @id @default(uuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Offer details
+  position      String
+  company       String
+  baseSalary    Float
+  marketRange   Json?    // {min: number, max: number}
+  equity        String?
+  bonus         Float?
+  benefits      String[]
+  
+  // Analysis
+  analysisText  String?
+  offerScore    Float?
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("negotiation_sessions")
+}
+
+// Future: Resume Reviews (placeholder for future feature)
+model ResumeReview {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Resume details
+  fileName      String
+  fileUrl       String?  // Could be Supabase storage URL
+  reviewText    String?
+  score         Float?
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("resume_reviews")
+}
+
+// Future: Learning modules (placeholder)
+model LearningModule {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  content       String?
+  category      String   // 'interview', 'negotiation', 'resume', etc.
+  difficulty    String?  // 'beginner', 'intermediate', 'advanced'
+  
+  createdAt     DateTime @default(now())
+  userProgress  UserProgress[]
+  
+  @@map("learning_modules")
+}
+
+// User progress in learning modules
+model UserProgress {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId      String
+  module        LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  status        String        @default("not_started") // 'not_started', 'in_progress', 'completed'
+  progress      Float         @default(0) // 0-100
+  completedAt   DateTime?
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@unique([userId, moduleId])
+  @@map("user_progress")
+}

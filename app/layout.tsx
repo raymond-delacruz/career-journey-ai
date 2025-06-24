@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
+import FeedbackButton from './components/FeedbackButton'
 
 export const metadata: Metadata = {
   title: 'Career Journey AI',
@@ -43,6 +44,9 @@ export default function RootLayout({
         <div className="container mx-auto">
           {children}
         </div>
+        
+        {/* Floating Feedback Button - appears on all pages */}
+        <FeedbackButton email="careerjourneyai@gmail.com" />
       </body>
     </html>
   )

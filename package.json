@@ -12,6 +12,8 @@
   "dependencies": {
     "@livekit/components-react": "^2.0.0",
     "@livekit/components-styles": "^1.0.0",
+    "@prisma/client": "^6.10.1",
+    "@supabase/supabase-js": "^2.50.1",
     "autoprefixer": "^10.4.16",
     "livekit-client": "^2.0.0",
     "livekit-server-sdk": "^2.0.0",
@@ -28,6 +30,7 @@
     "@types/react-dom": "^18.2.0",
     "eslint": "^8.51.0",
     "eslint-config-next": "^14.0.0",
+    "prisma": "^6.10.1",
     "typescript": "^5.2.0"
   }
 }
