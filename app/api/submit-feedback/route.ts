@@ -23,15 +23,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Save feedback to Supabase database
+    // Save feedback to Supabase database - using camelCase to match Prisma schema
     const { data, error } = await supabaseAdmin
       .from('feedbacks')
       .insert([
         {
-          feedback_text: feedback.trim(),
-          user_email: userEmail || null,
+          feedbackText: feedback.trim(),
+          userEmail: userEmail || null,
           page,
-          user_agent: userAgent,
+          userAgent,
           timestamp: new Date(timestamp)
         }
       ])
