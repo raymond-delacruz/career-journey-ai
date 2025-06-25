@@ -1757,14 +1757,14 @@ Best regards,
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Strengths */}
+          {/* Strengths and Areas for Improvement */}
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div className="bg-white rounded-lg p-4 border border-green-200">
               <h5 className="font-semibold text-green-800 mb-3 flex items-center">
-                ✅ What You Did Well
+                ✅ Strengths
               </h5>
               <ul className="space-y-2">
-                {emailFeedback.strengths.map((strength: string, index: number) => (
+                {emailFeedback.strengths?.map((strength: string, index: number) => (
                   <li key={index} className="text-sm text-gray-700 flex items-start">
                     <span className="text-green-600 mr-2 mt-1">•</span>
                     <span>{strength}</span>
@@ -1773,13 +1773,12 @@ Best regards,
               </ul>
             </div>
 
-            {/* Areas for Improvement */}
             <div className="bg-white rounded-lg p-4 border border-orange-200">
               <h5 className="font-semibold text-orange-800 mb-3 flex items-center">
-                🎯 Areas to Improve
+                🎯 Areas for Improvement
               </h5>
               <ul className="space-y-2">
-                {emailFeedback.areasForImprovement.map((improvement: string, index: number) => (
+                {emailFeedback.areasForImprovement?.map((improvement: string, index: number) => (
                   <li key={index} className="text-sm text-gray-700 flex items-start">
                     <span className="text-orange-600 mr-2 mt-1">•</span>
                     <span>{improvement}</span>
@@ -1789,7 +1788,6 @@ Best regards,
             </div>
           </div>
 
-          {/* Next Steps */}
           <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
             <h5 className="font-semibold text-blue-800 mb-3 flex items-center">
               🚀 Your Next Steps
@@ -2628,6 +2626,7 @@ ${shouldClose ?
         duration: 0
       }
       
+      // Remove duplicate setConversationHistory call - only keep one
       setConversationHistory(prev => [...prev, hiringManagerMessage])
       speakHiringManagerMessage(fallbackResponse)
     }
