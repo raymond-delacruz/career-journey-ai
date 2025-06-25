@@ -59,6 +59,13 @@ export default function NegotiationCoach() {
   const [currentTurnTime, setCurrentTurnTime] = useState(0)
   const [turnStartTime, setTurnStartTime] = useState<Date | null>(null)
   const [negotiationFocus, setNegotiationFocus] = useState<string[]>([])
+  
+  // Add missing state variables for session management
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
+  const [isListening, setIsListening] = useState(false)
+  const [conversationHistory, setConversationHistory] = useState<any[]>([])
+  const [sessionSummary, setSessionSummary] = useState<any>({})
+  const [negotiationOutcome, setNegotiationOutcome] = useState<any>(null)
 
   const recognitionRef = useRef<any>(null)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -494,13 +501,7 @@ export default function NegotiationCoach() {
 
   // Start session timer
   const startSessionTimer = () => {
-    const startTime = Date.now()
-    setSessionStartTime(startTime)
-    setTotalSessionTime(0)
-    
-    sessionTimerRef.current = setInterval(() => {
-      setTotalSessionTime(prev => prev + 1)
-    }, 1000)
+    setSessionStartTime(Date.now())
   }
 
   // Stop session timer
