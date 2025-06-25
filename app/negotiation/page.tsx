@@ -526,7 +526,7 @@ export default function NegotiationCoach() {
     }
     
     if (turnStartTime) {
-      const turnDuration = Math.floor((Date.now() - turnStartTime) / 1000)
+      const turnDuration = Math.floor((Date.now() - Number(turnStartTime)) / 1000)
       setCurrentTurnTime(0)
       return turnDuration
     }
@@ -1522,47 +1522,9 @@ Best regards,
                 </div>
               </div>
 
-              {/* Email Thread */}
-              <div className="max-h-96 overflow-y-auto">
-                {emailThread.map((email: EmailMessage, index: number) => (
-                  <div key={email.id} className={`border-b border-gray-200 ${
-                    email.sender === 'user' ? 'bg-blue-50' : 'bg-white'
-                  }`}>
-                    {/* Email Header */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                            email.sender === 'user' ? 'bg-blue-600' : 'bg-gray-600'
-                          }`}>
-                            {email.sender === 'user' ? 'You' : 'SJ'}
-                          </div>
-                          <div>
-                            <div className="font-medium text-sm text-gray-900">
-                              {email.sender === 'user' ? 'You' : 'Sarah Johnson'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {email.sender === 'user' ? 'you@email.com' : 'sarah.johnson@techcorp.com'}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(email.timestamp).toLocaleString()}
-                        </div>
-                      </div>
-                      
-                      {/* Subject Line */}
-                      <div className="text-sm font-medium text-gray-800 mb-3 ml-11">
-                        Subject: {email.subject}
-                      </div>
-                      
-                      {/* Email Content */}
-                      <div className="ml-11 text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                        {email.content}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              {/* Email Thread - Removed redundant conversation history display */}
+              <div className="p-4 text-center text-gray-500 text-sm">
+                <p>📧 Email conversation continues in the composer below</p>
               </div>
             </div>
 
@@ -2525,37 +2487,54 @@ function VoicePracticeMode({
   }
 
   const generateEnhancedHiringManagerResponse = async (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
-    // Prevent duplicate calls with the same message and turn count
-    const callKey = `${userMessage}-${userTurnCount}`
-    if (lastResponseKeyRef.current === callKey) {
-      console.log('⚠️ Duplicate generateEnhancedHiringManagerResponse call detected, ignoring')
-      return
-    }
-    lastResponseKeyRef.current = callKey
-    
-    // Find the selected scenario to guide the conversation
-    const selectedScenario = scenarios.find(s => s.title === voiceScenario)
-    const conversationTurn = userTurnCount - 1  // 0-indexed: 1st user message = turn 0, 2nd = turn 1, etc
-    console.log('DEBUG: conversationTurn =', conversationTurn, 'userTurnCount =', userTurnCount)
-    
-    // Build conversation context for ChatGPT
+    // Determine conversation context and stage
+    const conversationTurn = conversationHistory.filter(h => h.speaker === 'user').length
     const conversationContext = conversationHistory
-      .slice(-6) // Last 6 messages for context
-      .map(entry => `${entry.speaker === 'user' ? 'Candidate' : 'Hiring Manager'}: ${entry.message}`)
+      .slice(-4)
+      .map(h => `${h.speaker}: ${h.message}`)
       .join('\n')
     
-    // Create system prompt based on scenario and conversation turn
-    let systemPrompt = `You are an experienced hiring manager conducting a salary negotiation. You should be realistic, professional, but also protective of company budget. 
+    const selectedScenario = scenarios.find(s => s.title === voiceScenario) || scenarios[0]
+    
+    // Analyze conversation progress to determine if we should move toward resolution
+    const shouldMoveTowardResolution = conversationTurn >= 5 && Math.random() > 0.4
+    const shouldOffer = conversationTurn >= 3 && userMessage.toLowerCase().includes('salary') || 
+                       userMessage.toLowerCase().includes('offer') ||
+                       userMessage.toLowerCase().includes('compensation') ||
+                       userMessage.toLowerCase().includes('consider')
+    
+    const shouldClose = conversationTurn >= 7 || 
+                       userMessage.toLowerCase().includes('deal') ||
+                       userMessage.toLowerCase().includes('accept') ||
+                       userMessage.toLowerCase().includes('agree')
 
-Key guidelines:
-- Be conversational and natural, not robotic
-- Show some resistance initially, but be willing to negotiate 
-- Make counteroffers when appropriate
-- Reference specific numbers when discussing compensation
-- Be more flexible as the conversation progresses if the candidate is reasonable
-- Don't give away everything at once - negotiate incrementally
-- If candidate is aggressive or unreasonable, push back appropriately
+    let systemPrompt = `You are a professional hiring manager in a salary negotiation. 
+
+IMPORTANT: This negotiation should feel realistic and come to a natural conclusion. Based on the conversation stage:
+- Turn ${conversationTurn + 1} of negotiation
+- ${shouldMoveTowardResolution ? 'MOVE TOWARD RESOLUTION - Start making concrete offers or decisions' : 'Continue exploring and discussing'}
+- ${shouldOffer ? 'MAKE A SPECIFIC OFFER or COUNTEROFFER with numbers' : 'Focus on understanding needs and building rapport'}
+- ${shouldClose ? 'CLOSE THE NEGOTIATION with a final decision (accept, reject, or need time to decide)' : 'Keep the conversation flowing naturally'}
+
+Your personality:
+- Professional but human
+- Willing to negotiate within reason
+- Have real constraints and budgets
+- Want to find win-win solutions
+- Make concrete offers when appropriate
+- Can say "no" to unreasonable requests
+- Will end negotiations naturally when appropriate
+
+Negotiation Guidelines:
 - Keep responses to 2-3 sentences maximum for natural conversation flow
+- If turn >= 5: Start making specific offers or counteroffers with actual numbers
+- If turn >= 7: Move toward final decision (accept, counter, or decline)
+- If they ask for salary increases, provide specific amounts: "I can offer $X" or "Our budget allows for $Y"
+- If discussing benefits, be specific: "We can add 2 extra vacation days" or "I can approve a $2000 professional development budget"
+- End with clear next steps or final decisions when appropriate
+
+Current offer context: Base salary ${analysis?.baseSalary || 'not specified'}
+Market range: ${analysis?.marketRange?.min || 'unknown'} - ${analysis?.marketRange?.max || 'unknown'}
 
 Scenario context: ${selectedScenario?.title || 'General negotiation'}
 Conversation turn: ${conversationTurn + 1}
@@ -2566,10 +2545,16 @@ ${conversationContext}
 
 Current candidate message: ${userMessage}
 
-Respond as the hiring manager would in this negotiation:`
+${shouldClose ? 
+  'IMPORTANT: This should be one of the final exchanges. Provide a clear decision or final offer.' : 
+  shouldOffer ? 
+  'IMPORTANT: Make a specific, numerical offer or counteroffer.' : 
+  'Respond professionally as the hiring manager would in this negotiation:'
+}`
 
     try {
       console.log('🤖 Generating AI response for:', userMessage.substring(0, 100))
+      console.log(`📊 Conversation stage: Turn ${conversationTurn + 1}, Move to resolution: ${shouldMoveTowardResolution}, Should offer: ${shouldOffer}, Should close: ${shouldClose}`)
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -2587,8 +2572,8 @@ Respond as the hiring manager would in this negotiation:`
               content: userMessage
             }
           ],
-          temperature: 0.8, // More creative/varied responses
-          max_tokens: 150   // Keep responses concise
+          temperature: 0.7,
+          max_tokens: 200
         }),
       })
 
@@ -2610,6 +2595,23 @@ Respond as the hiring manager would in this negotiation:`
       
       setConversationHistory(prev => [...prev, hiringManagerMessage])
       
+      // Check if this response indicates negotiation completion
+      const isClosingResponse = aiResponse.toLowerCase().includes('final offer') ||
+                               aiResponse.toLowerCase().includes('accept') ||
+                               aiResponse.toLowerCase().includes('agree') ||
+                               aiResponse.toLowerCase().includes('deal') ||
+                               aiResponse.toLowerCase().includes('welcome aboard') ||
+                               aiResponse.toLowerCase().includes('look forward to') ||
+                               (conversationTurn >= 8 && Math.random() > 0.6)
+      
+      // Auto-generate outcome if negotiation is naturally concluding
+      if (isClosingResponse || conversationTurn >= 10) {
+        console.log('🎯 Negotiation appears to be concluding, preparing outcome tracking...')
+        setTimeout(() => {
+          generateAutomaticOutcome(aiResponse, conversationTurn)
+        }, 2000) // Give user time to see the final response
+      }
+      
       // Speak the response immediately
       speakHiringManagerMessage(aiResponse)
       
@@ -2629,6 +2631,75 @@ Respond as the hiring manager would in this negotiation:`
       setConversationHistory(prev => [...prev, hiringManagerMessage])
       speakHiringManagerMessage(fallbackResponse)
     }
+  }
+
+  const generateAutomaticOutcome = (finalResponse: string, turnCount: number) => {
+    // Analyze the final response to determine outcome
+    const lowerResponse = finalResponse.toLowerCase()
+    const isSuccessful = lowerResponse.includes('accept') || 
+                        lowerResponse.includes('deal') || 
+                        lowerResponse.includes('agree') ||
+                        lowerResponse.includes('welcome') ||
+                        lowerResponse.includes('look forward')
+    
+    const isRejected = lowerResponse.includes('cannot') ||
+                      lowerResponse.includes('unable') ||
+                      lowerResponse.includes('budget') ||
+                      lowerResponse.includes('policy')
+    
+    // Extract any salary numbers mentioned in conversation
+    const salaryNumbers = conversationHistory
+      .map(h => h.message.match(/\$[\d,]+/g))
+      .flat()
+      .filter(Boolean)
+      .map(s => parseInt(s!.replace(/[$,]/g, '')))
+      .filter(n => n > 10000) // Filter out non-salary numbers
+    
+    const originalSalary = Number(analysis?.baseSalary) || 0
+    const finalSalary = salaryNumbers.length > 0 ? 
+                       salaryNumbers[salaryNumbers.length - 1] : // Last mentioned salary
+                       originalSalary
+    
+    const outcome = {
+      originalSalary,
+      finalSalary,
+      percentIncrease: originalSalary > 0 ? 
+                      Math.round(((finalSalary - originalSalary) / originalSalary) * 100) : 0,
+      dollarIncrease: finalSalary - originalSalary,
+      otherBenefits: extractBenefitsFromConversation(),
+      negotiationStatus: (isSuccessful ? 'successful' : 
+                         isRejected ? 'unsuccessful' : 'ended') as 'successful' | 'unsuccessful' | 'ended'
+    }
+    
+    setNegotiationOutcome(outcome)
+    
+    // Show outcome input for manual adjustment
+    setTimeout(() => {
+      setShowOutcomeInput(true)
+    }, 1000)
+  }
+
+  const extractBenefitsFromConversation = (): string[] => {
+    const benefits: string[] = []
+    const allMessages = conversationHistory.map(h => h.message.toLowerCase()).join(' ')
+    
+    if (allMessages.includes('vacation') || allMessages.includes('pto')) {
+      benefits.push('Additional PTO')
+    }
+    if (allMessages.includes('remote') || allMessages.includes('work from home')) {
+      benefits.push('Remote work flexibility')
+    }
+    if (allMessages.includes('development') || allMessages.includes('training')) {
+      benefits.push('Professional development budget')
+    }
+    if (allMessages.includes('bonus') || allMessages.includes('signing')) {
+      benefits.push('Signing bonus')
+    }
+    if (allMessages.includes('equity') || allMessages.includes('stock')) {
+      benefits.push('Equity/stock options')
+    }
+    
+    return benefits
   }
 
   const endSession = () => {
@@ -2742,7 +2813,8 @@ Respond as the hiring manager would in this negotiation:`
       averageWordsPerResponse: Math.round(avgWordsPerResponse),
       responseQuality: Math.round(responseQuality),
       conversationHistory: conversationHistory,
-      structuredFeedback: null // Will be populated by AI analysis
+      structuredFeedback: null, // Will be populated by AI analysis
+      negotiationOutcome: null // Will be populated if outcome is recorded
     }
 
     // Generate structured feedback using AI
