@@ -499,38 +499,42 @@ export default function NegotiationCoach() {
 
   // Start session timer
   const startSessionTimer = () => {
-    setSessionStartTime(Date.now())
-  }
-
-  // Stop session timer
-  const stopSessionTimer = (): number => {
-    console.log('Session timer stopped')
-    return totalSessionTime
-  }
-
-  // Start turn timer
-  const startTurnTimer = () => {
-    setTurnStartTime(new Date())
-    setCurrentTurnTime(0)
-    
-    turnTimerRef.current = setInterval(() => {
-      setCurrentTurnTime(prev => prev + 1)
+    console.log('⏰ Session timer started')
+    const startTime = Date.now()
+    sessionTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      setTotalSessionTime(elapsed)
     }, 1000)
   }
-
-  // Stop turn timer and return duration
-  const stopTurnTimer = (): number => {
+  
+  const startTurnTimer = () => {
+    console.log('⏰ Turn timer started')
+    const startTime = Date.now()
+    turnTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      setCurrentTurnTime(elapsed)
+    }, 1000)
+  }
+  
+  const stopTurnTimer = () => {
+    console.log('⏰ Turn timer stopped')
     if (turnTimerRef.current) {
       clearInterval(turnTimerRef.current)
       turnTimerRef.current = null
     }
-    
-    if (turnStartTime) {
-      const turnDuration = Math.floor((Date.now() - Number(turnStartTime)) / 1000)
-      setCurrentTurnTime(0)
-      return turnDuration
+    const turnTime = currentTurnTime
+    setCurrentTurnTime(0)
+    return turnTime
+  }
+
+  // Stop session timer
+  const stopSessionTimer = (): number => {
+    console.log('⏰ Session timer stopped')
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current)
+      sessionTimerRef.current = null
     }
-    return 0
+    return totalSessionTime
   }
 
   return (
@@ -1874,16 +1878,32 @@ function VoicePracticeMode({
   
   // Add missing timer functions
   const startSessionTimer = () => {
-    console.log('Session timer started')
+    console.log('⏰ Session timer started')
+    const startTime = Date.now()
+    sessionTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      setTotalSessionTime(elapsed)
+    }, 1000)
   }
   
   const startTurnTimer = () => {
-    console.log('Turn timer started')
+    console.log('⏰ Turn timer started')
+    const startTime = Date.now()
+    turnTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      setCurrentTurnTime(elapsed)
+    }, 1000)
   }
   
   const stopTurnTimer = () => {
-    console.log('Turn timer stopped')
-    return 0
+    console.log('⏰ Turn timer stopped')
+    if (turnTimerRef.current) {
+      clearInterval(turnTimerRef.current)
+      turnTimerRef.current = null
+    }
+    const turnTime = currentTurnTime
+    setCurrentTurnTime(0)
+    return turnTime
   }
   
   // Add missing recording state and refs
@@ -1904,7 +1924,11 @@ function VoicePracticeMode({
   
   // Add missing functions
   const stopSessionTimer = (): number => {
-    console.log('Session timer stopped')
+    console.log('⏰ Session timer stopped')
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current)
+      sessionTimerRef.current = null
+    }
     return totalSessionTime
   }
   
@@ -1942,7 +1966,6 @@ function VoicePracticeMode({
       description: 'Practice negotiating overall compensation package including salary, bonus, and equity',
       category: 'Compensation',
       goal: 'Secure market-competitive total compensation with balanced mix of base, bonus, and equity',
-      initialMessage: `Hi there! I'm excited to discuss the compensation package with you. I know total compensation is important - not just base salary, but the complete picture including bonus potential and equity participation. Let's talk through what would make this package compelling for you. What aspects of the total compensation are most important to your decision?`,
       strategy: 'Focus on total package value, market research, performance incentives, and long-term wealth building'
     },
     {
@@ -1951,7 +1974,6 @@ function VoicePracticeMode({
       description: 'Negotiate comprehensive benefits including health, retirement, PTO, and professional development',
       category: 'Benefits',
       goal: 'Secure enhanced benefits package with improved health coverage, retirement matching, and professional development budget',
-      initialMessage: `Let's discuss the benefits package - I know these can be just as valuable as salary for many people. We want to make sure you have comprehensive coverage and support. What benefits are most important to you and your family? Are there specific areas where you'd like to see enhancements to our standard package?`,
       strategy: 'Emphasize family needs, health priorities, retirement planning, work-life balance, and career growth'
     },
     {
@@ -1960,7 +1982,6 @@ function VoicePracticeMode({
       description: 'Open-ended negotiation practice covering multiple aspects of the offer',
       category: 'General',
       goal: 'Practice comprehensive negotiation skills across various offer components',
-      initialMessage: `Thanks for taking the time to discuss the offer details with me. I want to make sure we create a package that works well for both you and the company. I'm open to discussing any aspects of the offer - compensation, benefits, work arrangements, start date, or anything else that's important to your decision. What would you like to focus on first?`,
       strategy: 'Be flexible, prioritize requests, find creative solutions, and maintain positive relationship throughout'
     }
   ]
@@ -2066,6 +2087,76 @@ function VoicePracticeMode({
     }
   }
 
+  const generateInitialMessage = async (scenario: any) => {
+    console.log('🤖 Generating initial message for scenario:', scenario.title)
+    
+    const systemPrompt = `You are a professional hiring manager starting a salary negotiation conversation. Generate a natural, welcoming opening message (30-50 words) for this specific scenario:
+
+Scenario: ${scenario.title}
+Goal: ${scenario.goal} 
+Strategy: ${scenario.strategy}
+
+Current offer details:
+- Position: ${analysis?.position || 'Software Engineer'}
+- Company: ${analysis?.company || 'TechCorp'}
+- Base Salary: $${analysis?.baseSalary || 100000}
+- Current Benefits: ${analysis?.benefits?.length || 0} listed
+
+Create a friendly, professional opening that:
+- Sets the right tone for this specific scenario
+- References the relevant aspects of their offer
+- Asks an engaging question to start the conversation
+- Feels natural and personalized
+
+Keep it conversational and under 50 words.`
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `Generate an opening message for the ${scenario.title} negotiation scenario.`
+            }
+          ],
+          temperature: 0.8,
+          max_tokens: 150
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const initialMessage = data.choices?.[0]?.message?.content || `Hi! I'm excited to discuss your ${scenario.title.toLowerCase()} package. What aspects are most important to you?`
+      
+      console.log('🤖 Generated initial message:', initialMessage.substring(0, 100) + '...')
+      return initialMessage
+      
+    } catch (error) {
+      console.error('Error generating initial message:', error)
+      
+      // Fallback messages based on scenario
+      const fallbackMessages = {
+        'Total Compensation': `Hi! I'm excited to discuss your total compensation package. What aspects of salary, bonus, and equity are most important to you?`,
+        'Benefits': `Let's talk about your benefits package. What benefits matter most to you and your family?`,
+        'General Practice': `Thanks for taking time to discuss your offer. What would you like to focus on today?`
+      }
+      
+      return fallbackMessages[scenario.title as keyof typeof fallbackMessages] || 
+             `Hi! I'm excited to discuss your offer. What aspects would you like to focus on?`
+    }
+  }
+
   const startVoicePractice = async () => {
     console.log('🚀 startVoicePractice called')
     console.log('📊 Current analysis:', !!analysis)
@@ -2101,12 +2192,16 @@ function VoicePracticeMode({
     // Find the selected scenario or use the first one
     const selectedScenario = scenarios.find(s => s.title === voiceScenario) || scenarios[0]
     console.log('🎭 Selected scenario:', selectedScenario.title)
-    console.log('💬 Initial message:', selectedScenario.initialMessage.substring(0, 100) + '...')
+    
+    // Generate initial message using ChatGPT
+    console.log('🤖 Generating initial message with ChatGPT...')
+    const initialMessageText = await generateInitialMessage(selectedScenario)
+    console.log('💬 Generated initial message:', initialMessageText.substring(0, 100) + '...')
     
     // Add initial message to conversation
     const initialMessage = {
       speaker: 'hiring_manager' as const,
-      message: selectedScenario.initialMessage,
+      message: initialMessageText,
       timestamp: new Date().toISOString(),
       duration: 0
     }
@@ -2118,7 +2213,7 @@ function VoicePracticeMode({
     console.log('⏰ Setting timeout to speak initial message in 1 second...')
     setTimeout(() => {
       console.log('🎙️ Timeout executed, calling speakHiringManagerMessage...')
-      speakHiringManagerMessage(selectedScenario.initialMessage)
+      speakHiringManagerMessage(initialMessageText)
     }, 1000)
   }
 
@@ -2263,158 +2358,103 @@ function VoicePracticeMode({
     console.log('🎤 Starting speech recognition...')
     setIsListening(true)
     setIsPreparingToListen(false)
-    startTurnTimer()
+    setCurrentResponse('')
 
-    // Enhanced speech recognition with better mobile support
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
+    // Start turn timer when user starts speaking
+    startTurnTimer()
     
-    if (!SpeechRecognition) {
-      console.error('❌ Speech recognition not supported')
-      alert('Speech recognition is not supported in your browser. Please use Chrome, Safari, or Edge.')
+    if (!('webkitSpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.')
       setIsListening(false)
-      setIsRecording(false)
-      stopTurnTimer()
       return
     }
 
-      const recognition = new SpeechRecognition()
+    try {
+      const recognition = new (window as any).webkitSpeechRecognition()
       recognitionRef.current = recognition
 
-    // Enhanced settings for better mobile compatibility
       recognition.continuous = true
       recognition.interimResults = true
       recognition.lang = 'en-US'
-    recognition.maxAlternatives = 1
-    
-    // Mobile-specific optimizations
-    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-      console.log('📱 Mobile device detected, optimizing settings...')
-      recognition.continuous = false // Better for mobile
-      recognition.interimResults = false // Reduce processing load
-    }
+      recognition.maxAlternatives = 1
+
+      let finalTranscript = ''
+      let silenceTimer: NodeJS.Timeout | null = null
 
       recognition.onstart = () => {
-        console.log('🎤 Speech recognition started')
+        console.log('🎙️ Speech recognition started')
         setIsRecording(true)
         
-        // Auto-stop after 2 minutes max
-        if (maxRecordingTimeoutRef.current) {
-          clearTimeout(maxRecordingTimeoutRef.current)
-        }
+        // Set maximum recording time (60 seconds)
         maxRecordingTimeoutRef.current = setTimeout(() => {
-          console.log('⏰ Max recording time reached, stopping...')
+          console.log('⏰ Maximum recording time reached, stopping...')
           stopListening()
-        }, 120000) // 2 minutes
+          if (finalTranscript.trim()) {
+            processUserResponse(finalTranscript.trim())
+          }
+        }, 60000)
       }
 
       recognition.onresult = (event: any) => {
-        let finalTranscript = ''
         let interimTranscript = ''
-
+        
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
-            finalTranscript += transcript
+            finalTranscript += transcript + ' '
           } else {
             interimTranscript += transcript
           }
         }
 
-        if (finalTranscript) {
-          console.log('📝 Final transcript:', finalTranscript)
-          setCurrentResponse(prev => {
-            const newResponse = (prev + ' ' + finalTranscript).trim()
-            
-            // Clear and reset silence timeout on new speech
-            if (silenceTimeoutRef.current) {
-              clearTimeout(silenceTimeoutRef.current)
-              silenceTimeoutRef.current = null
-            }
-            
-          // Auto-advance after 3 seconds of silence (or immediately on mobile)
-          const silenceDelay = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 1500 : 3000
-            silenceTimeoutRef.current = setTimeout(() => {
-              if (isListeningRef.current && 
-                  !hiringManagerSpeakingRef.current && 
-                  newResponse.trim() && 
-                  sessionStartedRef.current) {
-                console.log('🔇 Silence detected, processing response:', newResponse.trim())
-                stopListening()
-                setTimeout(() => {
-                  if (newResponse.trim()) {
-                    processUserResponse(newResponse.trim())
-                  }
-                }, 500)
-              }
-          }, silenceDelay)
-            
-            return newResponse
-          })
-        }
-      }
+        setCurrentResponse(finalTranscript + interimTranscript)
 
-      recognition.onend = () => {
-        console.log('🎤 Speech recognition ended')
-        setIsRecording(false)
-        
-      // Mobile devices often end recognition automatically, so restart if needed
-        if (isListeningRef.current && sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
-          console.log('🔄 Restarting speech recognition...')
-          setTimeout(() => {
-            if (isListeningRef.current) {
-              startListening()
-            }
-          }, 100)
+        // Clear existing silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
         }
+
+        // Set new silence timer (2.5 seconds of silence)
+        silenceTimer = setTimeout(() => {
+          if (finalTranscript.trim()) {
+            console.log('💭 Silence detected, processing response:', finalTranscript.trim())
+            processUserResponse(finalTranscript.trim())
+          }
+        }, 2500)
+        
+        silenceTimeoutRef.current = silenceTimer
       }
 
       recognition.onerror = (event: any) => {
         console.error('❌ Speech recognition error:', event.error)
-        setIsListening(false)
-        setIsRecording(false)
-        stopTurnTimer()
-        
-      // Enhanced error handling for mobile
-      switch (event.error) {
-        case 'no-speech':
-          console.log('⚠️ No speech detected, will retry...')
-          setTimeout(() => {
-            if (sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
-              startListening()
-            }
-          }, 1000)
-          break
-        case 'audio-capture':
-          console.error('❌ Audio capture error - check microphone permissions')
-          alert('Microphone access is required for voice practice. Please check your browser permissions.')
-          break
-        case 'not-allowed':
-          console.error('❌ Microphone permission denied')
-          alert('Microphone permission is required for voice practice. Please allow microphone access and try again.')
-          break
-        case 'network':
-          console.error('❌ Network error during speech recognition')
-          alert('Network error occurred. Please check your internet connection and try again.')
-          break
-        default:
-          console.error('❌ Speech recognition error:', event.error)
-          // Try to restart on other errors
-          setTimeout(() => {
-            if (sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
-              startListening()
-            }
-          }, 2000)
+        if (event.error === 'no-speech') {
+          console.log('👤 No speech detected, continuing to listen...')
+        } else {
+          setIsListening(false)
+          setIsRecording(false)
         }
       }
 
-      try {
-        recognition.start()
-      } catch (error) {
-        console.error('❌ Error starting recognition:', error)
-        setIsListening(false)
+      recognition.onend = () => {
+        console.log('🔇 Speech recognition ended')
         setIsRecording(false)
-        stopTurnTimer()
-      alert('Failed to start speech recognition. Please try again.')
+        
+        // Clear timeouts
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+        if (maxRecordingTimeoutRef.current) {
+          clearTimeout(maxRecordingTimeoutRef.current)
+          maxRecordingTimeoutRef.current = null
+        }
+      }
+
+      recognition.start()
+      
+    } catch (error) {
+      console.error('❌ Error starting speech recognition:', error)
+      setIsListening(false)
+      setIsRecording(false)
     }
   }
 
@@ -2445,13 +2485,17 @@ function VoicePracticeMode({
   }
 
   const processUserResponse = (userMessage: string) => {
-    // Prevent duplicate processing
-    if (isProcessingResponseRef.current) {
-      console.log('⚠️ Already processing response, ignoring duplicate call')
+    // Prevent duplicate processing - check message and timing
+    const currentTime = Date.now()
+    const lastMessageKey = `${userMessage.trim()}-${Math.floor(currentTime / 2000)}` // 2-second window
+    
+    if (isProcessingResponseRef.current || lastResponseKeyRef.current === lastMessageKey) {
+      console.log('⚠️ Already processing this response, ignoring duplicate call')
       return
     }
     
     isProcessingResponseRef.current = true
+    lastResponseKeyRef.current = lastMessageKey
     console.log('🔄 Processing user response:', userMessage)
     
     const turnDuration = stopTurnTimer()
@@ -2464,42 +2508,67 @@ function VoicePracticeMode({
       duration: turnDuration
     }
     
-    // Update conversation history and calculate turn count from the updated state
+    // Store the user turn count BEFORE updating conversation history
+    let userTurnCount = 0
+    
+    // Update conversation history and get real-time turn count
     setConversationHistory(prev => {
-      const newHistory = [...prev, userResponse]
-      const newUserTurnCount = newHistory.filter(h => h.speaker === 'user').length
-      console.log('DEBUG: newUserTurnCount =', newUserTurnCount)
+      // Check if this exact message is already in the history (additional safety)
+      const isDuplicate = prev.some(msg => 
+        msg.speaker === 'user' && 
+        msg.message === userMessage && 
+        Math.abs(Date.now() - new Date(msg.timestamp).getTime()) < 5000 // Within 5 seconds
+      )
       
-      // Generate AI response with a short delay to prevent race conditions
-      setTimeout(async () => {
-        try {
-          await generateEnhancedHiringManagerResponse(userMessage, turnDuration, newUserTurnCount)
-        } catch (error) {
-          console.error('Error in generateEnhancedHiringManagerResponse:', error)
-        } finally {
-          // Reset processing flag after AI response completes
-          isProcessingResponseRef.current = false
-        }
-      }, 500)
+      if (isDuplicate) {
+        console.log('⚠️ Duplicate message detected in conversation history, skipping')
+        isProcessingResponseRef.current = false // Reset flag
+        return prev
+      }
+      
+      const newHistory = [...prev, userResponse]
+      
+      // Calculate user turn count from the updated history
+      userTurnCount = newHistory.filter(h => h.speaker === 'user').length
+      console.log('DEBUG: Real-time user turn count =', userTurnCount)
       
       return newHistory
     })
+    
+    // Generate AI response OUTSIDE of the state setter to avoid multiple calls
+    setTimeout(async () => {
+      try {
+        if (userTurnCount > 0) { // Only proceed if we have a valid turn count
+          await generateEnhancedHiringManagerResponse(userMessage, turnDuration, userTurnCount)
+        }
+      } catch (error) {
+        console.error('Error in generateEnhancedHiringManagerResponse:', error)
+      } finally {
+        // Reset processing flag after AI response completes
+        isProcessingResponseRef.current = false
+      }
+    }, 500)
+    
     setCurrentResponse('')
   }
 
   const generateEnhancedHiringManagerResponse = async (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
+    // Create unique key for this request to prevent duplicates
+    const requestKey = `${userMessage}-${userTurnCount}-${Date.now()}`
+    
     // Check if already generating to prevent duplicates
-    if (hiringManagerSpeakingRef.current) {
+    if (hiringManagerSpeakingRef.current || lastResponseKeyRef.current === requestKey) {
       console.log('⚠️ Already generating response, skipping duplicate call')
       return
     }
 
+    lastResponseKeyRef.current = requestKey
     console.log('🤖 Generating AI response for:', userMessage.substring(0, 100))
 
     const conversationTurn = userTurnCount
-    const shouldMoveTowardResolution = conversationTurn >= 3
-    const shouldOffer = conversationTurn <= 3
-    const shouldClose = conversationTurn >= 6
+    const shouldMoveTowardResolution = conversationTurn >= 5 // Less aggressive
+    const shouldOffer = conversationTurn <= 4 // More turns for offers
+    const shouldClose = conversationTurn >= 8 // Much later closing
     
     console.log(`📊 Conversation stage: Turn ${conversationTurn}, Move to resolution: ${shouldMoveTowardResolution}, Should offer: ${shouldOffer}, Should close: ${shouldClose}`)
     
@@ -2516,7 +2585,8 @@ Guidelines:
 - ${shouldClose ? 'Aim to conclude negotiation naturally' : 'Continue discussion'}
 - Use specific numbers for salary/benefits when making offers
 - Be professional but decisive
-- If candidate accepts or negotiation reaches natural end, conclude professionally
+- Only conclude if candidate explicitly accepts or you've made a final offer
+- Keep the conversation going unless there's a clear resolution
 
 Conversation so far:
 ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n')}
@@ -2564,26 +2634,24 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
       // Add to conversation history (only once!)
       setConversationHistory(prev => [...prev, hiringManagerMessage])
       
-      // Check if this response indicates negotiation completion
-      const isClosingResponse = aiResponse.toLowerCase().includes('final offer') ||
-                               aiResponse.toLowerCase().includes('accept') ||
-                               aiResponse.toLowerCase().includes('agree') ||
-                               aiResponse.toLowerCase().includes('deal') ||
-                               aiResponse.toLowerCase().includes('welcome aboard') ||
-                               aiResponse.toLowerCase().includes('look forward to') ||
-                               aiResponse.toLowerCase().includes('thank you for considering') ||
-                               (conversationTurn >= 8 && Math.random() > 0.6)
+      // Much more conservative closing detection - only end if very explicit
+      const isClosingResponse = (aiResponse.toLowerCase().includes('welcome aboard') ||
+                               aiResponse.toLowerCase().includes('congratulations') ||
+                               (aiResponse.toLowerCase().includes('final offer') && 
+                                (aiResponse.toLowerCase().includes('take it or leave it') || 
+                                 aiResponse.toLowerCase().includes('cannot go higher'))) ||
+                               conversationTurn >= 12) // Much higher threshold
       
-      // Auto-generate outcome if negotiation is naturally concluding
-      if (isClosingResponse || conversationTurn >= 10) {
-        console.log('🎯 Negotiation appears to be concluding, preparing outcome tracking...')
+      // Only auto-generate outcome if negotiation is clearly concluding
+      if (isClosingResponse) {
+        console.log('🎯 Negotiation clearly concluding, preparing outcome tracking...')
         setTimeout(() => {
           generateAutomaticOutcome(aiResponse, conversationTurn)
           // Auto-end session after outcome is generated
           setTimeout(() => {
             endSession()
-          }, 3000)
-        }, 2000) // Give user time to see the final response
+          }, 5000) // More time to read final response
+        }, 3000)
       }
       
       // Speak the response - this will handle the speaking flag management
@@ -2608,79 +2676,89 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
   }
 
   const generateAutomaticOutcome = (finalResponse: string, turnCount: number) => {
-    console.log('🎯 Generating automatic negotiation outcome...')
+    console.log('🎯 Generating automatic negotiation outcome...', { finalResponse, turnCount })
     
-    // Analyze the entire conversation to determine outcome
-    const allMessages = conversationHistory.map(h => h.message.toLowerCase()).join(' ')
-    const lowerResponse = finalResponse.toLowerCase()
+    // Get original offer data from analysis
+    const originalSalary = analysis?.baseSalary || analysis?.totalCompensation || 0
+    console.log('💰 Original salary from analysis:', originalSalary)
     
-    // Determine success status based on language patterns
-    const isSuccessful = lowerResponse.includes('accept') || 
-                        lowerResponse.includes('deal') || 
-                        lowerResponse.includes('agree') ||
-                        lowerResponse.includes('welcome') ||
-                        lowerResponse.includes('look forward') ||
-                        lowerResponse.includes('excited') ||
-                        lowerResponse.includes('offer you') ||
-                        allMessages.includes('sounds good') ||
-                        allMessages.includes('works for me')
+    // Determine if negotiation was successful based on user participation and content
+    const userResponses = conversationHistory.filter(h => h.speaker === 'user')
+    const totalUserWords = userResponses.reduce((total, response) => total + response.message.split(' ').length, 0)
     
-    const isRejected = lowerResponse.includes('cannot') ||
-                      lowerResponse.includes('unable') ||
-                      lowerResponse.includes('budget constraints') ||
-                      lowerResponse.includes('policy') ||
-                      lowerResponse.includes('best we can do') ||
-                      lowerResponse.includes('final offer')
+    // Check for negotiation success indicators
+    const successIndicators = [
+      'accept', 'agree', 'sounds good', 'deal', 'yes', 'perfect', 'great',
+      'thank you', 'appreciate', 'looking forward'
+    ]
     
-    // Extract ALL salary numbers mentioned in conversation
-    const allConversationText = conversationHistory.map(h => h.message).join(' ')
-    const salaryMatches = allConversationText.match(/\$[\d,]+(?:,\d{3})*(?:\.\d{2})?/g) || []
-    const salaryNumbers = salaryMatches
-      .map(s => parseInt(s.replace(/[$,]/g, '')))
-      .filter(n => n >= 30000 && n <= 1000000) // Realistic salary range
-      .sort((a, b) => b - a) // Sort highest to lowest
+    const rejectionIndicators = [
+      'decline', 'reject', 'no thank', 'cannot accept', 'need to think',
+      'not interested', 'pass', 'unfortunately'
+    ]
     
-    console.log('💰 Salary numbers found in conversation:', salaryNumbers)
+    const hasSuccessIndicators = successIndicators.some(indicator => 
+      finalResponse.toLowerCase().includes(indicator)
+    )
     
-    const originalSalary = Number(analysis?.baseSalary) || 100000
+    const hasRejectionIndicators = rejectionIndicators.some(indicator => 
+      finalResponse.toLowerCase().includes(indicator)
+    )
     
-    // Determine final salary intelligently
+    // Extract salary numbers from conversation
+    const salaryNumbers = conversationHistory
+      .map(h => h.message)
+      .join(' ')
+      .match(/\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*k?/gi)
+      ?.map(match => {
+        let num = parseFloat(match.replace(/[$,k]/gi, ''))
+        if (match.toLowerCase().includes('k')) num *= 1000
+        return num
+      })
+      .filter(num => num >= 30000 && num <= 1000000) // Reasonable salary range
+      .sort((a, b) => b - a) // Sort descending
+    
+    console.log('💸 Extracted salary numbers:', salaryNumbers)
+    
+    // Determine final salary
     let finalSalary = originalSalary
-    
-    if (isSuccessful && salaryNumbers.length > 0) {
-      // If successful, take the highest reasonable salary mentioned
-      finalSalary = salaryNumbers[0]
-    } else if (isRejected && salaryNumbers.length > 1) {
-      // If rejected, they likely countered but it was rejected
-      finalSalary = originalSalary // Stick with original
-    } else if (salaryNumbers.length > 0) {
-      // If neutral/ongoing, take the most recent meaningful offer
-      const recentSalaries = salaryNumbers.slice(0, 2)
-      finalSalary = recentSalaries[0] || originalSalary
+    if (salaryNumbers && salaryNumbers.length > 0) {
+      // Use the highest salary mentioned that's different from original
+      const highestMentioned = salaryNumbers[0]
+      if (highestMentioned !== originalSalary) {
+        finalSalary = highestMentioned
+      }
     }
     
-    // Ensure final salary is reasonable
-    if (finalSalary < originalSalary * 0.8 || finalSalary > originalSalary * 1.5) {
-      console.log('🚨 Final salary seems unrealistic, capping at reasonable range')
-      finalSalary = Math.min(Math.max(finalSalary, originalSalary * 0.9), originalSalary * 1.3)
+    // Calculate changes
+    const dollarIncrease = finalSalary - originalSalary
+    const percentIncrease = originalSalary > 0 ? Math.round((dollarIncrease / originalSalary) * 100 * 10) / 10 : 0
+    
+    // Determine negotiation status
+    let negotiationStatus: 'in_progress' | 'successful' | 'unsuccessful' | 'ended' = 'in_progress'
+    if (hasSuccessIndicators && dollarIncrease >= 0) {
+      negotiationStatus = 'successful'
+    } else if (hasRejectionIndicators || dollarIncrease < 0) {
+      negotiationStatus = 'unsuccessful'
+    } else if (turnCount >= 8) {
+      negotiationStatus = 'ended'
     }
+    
+    // Extract other benefits mentioned
+    const benefits = extractBenefitsFromConversation()
     
     const outcome = {
-      originalSalary,
-      finalSalary,
-      percentIncrease: originalSalary > 0 ? 
-                      Math.round(((finalSalary - originalSalary) / originalSalary) * 100) : 0,
-      dollarIncrease: finalSalary - originalSalary,
-      otherBenefits: extractBenefitsFromConversation(),
-      negotiationStatus: (isSuccessful ? 'successful' : 
-                         isRejected ? 'unsuccessful' : 'ended') as 'successful' | 'unsuccessful' | 'ended'
+      originalSalary: Number(originalSalary),
+      finalSalary: Number(finalSalary),
+      dollarIncrease,
+      percentIncrease,
+      otherBenefits: benefits,
+      negotiationStatus
     }
     
-    console.log('📊 Generated negotiation outcome:', outcome)
+    console.log('✅ Negotiation outcome generated:', outcome)
     setNegotiationOutcome(outcome)
-    
-    // Don't show manual input - make it fully automated
-    // The outcome is now automatically captured and will be displayed in the session summary
+    return outcome
   }
 
   const extractBenefitsFromConversation = (): string[] => {
@@ -3348,13 +3426,6 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                   <p className="text-xs text-gray-600 font-medium">Session</p>
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => setShowOutcomeInput(true)}
-                      disabled={!sessionStarted}
-                      className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-xs hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      💰 Record Outcome
-                    </button>
-                    <button
                       onClick={endSession}
                       disabled={!sessionStarted}
                       className="flex-1 bg-purple-600 text-white px-3 py-2 rounded text-xs hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -3387,7 +3458,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Session Metrics */}
             <div className="bg-blue-50 rounded-lg p-4">
               <h4 className="font-semibold text-blue-800 mb-3">📊 Session Metrics</h4>
@@ -3411,7 +3482,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
               </div>
             </div>
 
-            {/* Negotiation Outcome */}
+            {/* Negotiation Results or Session Stats */}
             {sessionSummary.negotiationOutcome ? (
               <div className="bg-green-50 rounded-lg p-4">
                 <h4 className="font-semibold text-green-800 mb-3">💰 Negotiation Results</h4>
@@ -3459,57 +3530,27 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                 </div>
               </div>
             ) : (
-              /* Communication Quality */
-              <div className="bg-green-50 rounded-lg p-4">
-                <h4 className="font-semibold text-green-800 mb-3">🎯 Communication Quality</h4>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-gray-600">Response Timing</span>
-                      <span className="text-sm font-medium">{sessionSummary.responseQuality}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          sessionSummary.responseQuality >= 80 ? 'bg-green-500' :
-                          sessionSummary.responseQuality >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${sessionSummary.responseQuality}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Based on 15-45 second optimal response window
-                    </p>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-3">📈 Session Stats</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total Exchanges:</span>
+                    <span className="font-medium">{sessionSummary.totalTurns}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Topics Discussed:</span>
+                    <span className="font-medium">{sessionSummary.negotiationTopics?.length || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Engagement Level:</span>
+                    <span className="font-medium">
+                      {sessionSummary.userTurns >= 5 ? 'High' : sessionSummary.userTurns >= 3 ? 'Medium' : 'Low'}
+                    </span>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Communication Quality */}
-            <div className="bg-green-50 rounded-lg p-4">
-              <h4 className="font-semibold text-green-800 mb-3">🎯 Communication Quality</h4>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-600">Response Timing</span>
-                    <span className="text-sm font-medium">{sessionSummary.responseQuality}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${
-                        sessionSummary.responseQuality >= 80 ? 'bg-green-500' :
-                        sessionSummary.responseQuality >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${sessionSummary.responseQuality}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Based on 15-45 second optimal response window
-                  </p>
-                </div>
-                </div>
-              </div>
-            </div>
+          </div>
 
           {/* Performance Insights - Enhanced with Structured Feedback */}
           <div className="space-y-4 mb-6">
@@ -3643,32 +3684,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
           </div>
 
           {/* Conversation Review */}
-          <div className="border-t border-gray-200 pt-4">
-            <h4 className="font-semibold text-gray-800 mb-3">💬 Conversation Review</h4>
-            <div className="max-h-60 overflow-y-auto space-y-3">
-              {sessionSummary.conversationHistory.map((entry: any, index: number) => (
-                <div key={index} className={`flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg text-sm ${
-                    entry.speaker === 'user' 
-                      ? 'bg-purple-100 text-purple-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-xs">
-                        {entry.speaker === 'user' ? 'You' : 'Hiring Manager'}
-                      </span>
-                      {entry.duration && entry.duration > 0 && (
-                        <span className="text-xs opacity-75">
-                          {formatTime(entry.duration)}
-                        </span>
-                      )}
-                    </div>
-                    <p>{entry.message}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Removed conversation review section as requested */}
 
           {/* Action Buttons */}
           <div className="flex justify-center space-x-4 mt-6 pt-4 border-t border-gray-200">
