@@ -1674,8 +1674,10 @@ function VoicePracticeMode({
   const hiringManagerSpeakingRef = useRef(false)
   const isListeningRef = useRef(false)
   const sessionStartedRef = useRef(false)
+  const isProcessingResponseRef = useRef(false)
+  const lastResponseKeyRef = useRef<string | null>(null)
   
-  // Timer refs
+  // Session timers
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const turnTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -1924,6 +1926,12 @@ function VoicePracticeMode({
   const speakHiringManagerMessage = async (message: string) => {
     console.log('🎙️ speakHiringManagerMessage called with message:', message.substring(0, 100) + '...')
     
+    // Prevent double calls if already speaking
+    if (hiringManagerSpeakingRef.current) {
+      console.log('⚠️ Already speaking, ignoring duplicate call')
+      return
+    }
+    
     try {
       console.log('🔄 Setting isHiringManagerSpeaking to true')
       setIsHiringManagerSpeaking(true)
@@ -1955,6 +1963,11 @@ function VoicePracticeMode({
       const audioUrl = URL.createObjectURL(audioBlob)
       const audio = new Audio(audioUrl)
 
+      // Add more audio debugging
+      audio.volume = 1.0
+      console.log('🔊 Audio volume set to:', audio.volume)
+      console.log('🎵 Audio URL created:', audioUrl.substring(0, 50) + '...')
+
       audio.onended = () => {
         console.log('🎙️ OpenAI TTS audio finished playing')
         setIsHiringManagerSpeaking(false)
@@ -1975,6 +1988,7 @@ function VoicePracticeMode({
 
       audio.onerror = (error) => {
         console.error('❌ Audio playback error:', error)
+        console.error('❌ Audio error details:', audio.error)
         setIsHiringManagerSpeaking(false)
         hiringManagerSpeakingRef.current = false
         URL.revokeObjectURL(audioUrl)
@@ -1994,8 +2008,18 @@ function VoicePracticeMode({
         }, speechDuration)
       }
 
+      audio.onloadstart = () => console.log('🎵 Audio loading started')
+      audio.oncanplay = () => console.log('🎵 Audio can play')
+      audio.onplay = () => console.log('🎵 Audio play event fired')
+
       console.log('▶️ Starting OpenAI TTS audio playback...')
-      await audio.play()
+      try {
+        await audio.play()
+        console.log('✅ Audio.play() completed successfully')
+      } catch (playError) {
+        console.error('❌ Audio.play() failed:', playError)
+        throw playError
+      }
       
     } catch (error) {
       console.error('❌ TTS API error, using simulated speech:', error)
@@ -2042,115 +2066,156 @@ function VoicePracticeMode({
     setIsPreparingToListen(false)
     startTurnTimer()
 
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
-      const recognition = new SpeechRecognition()
-      recognitionRef.current = recognition
+    // Enhanced speech recognition with better mobile support
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
+    
+    if (!SpeechRecognition) {
+      console.error('❌ Speech recognition not supported')
+      alert('Speech recognition is not supported in your browser. Please use Chrome, Safari, or Edge.')
+      setIsListening(false)
+      setIsRecording(false)
+      stopTurnTimer()
+      return
+    }
 
-      recognition.continuous = true
-      recognition.interimResults = true
-      recognition.lang = 'en-US'
+    const recognition = new SpeechRecognition()
+    recognitionRef.current = recognition
 
-      recognition.onstart = () => {
-        console.log('🎤 Speech recognition started')
-        setIsRecording(true)
-        
-        // Auto-stop after 2 minutes max
-        if (maxRecordingTimeoutRef.current) {
-          clearTimeout(maxRecordingTimeoutRef.current)
+    // Enhanced settings for better mobile compatibility
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognition.maxAlternatives = 1
+    
+    // Mobile-specific optimizations
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      console.log('📱 Mobile device detected, optimizing settings...')
+      recognition.continuous = false // Better for mobile
+      recognition.interimResults = false // Reduce processing load
+    }
+
+    recognition.onstart = () => {
+      console.log('🎤 Speech recognition started')
+      setIsRecording(true)
+      
+      // Auto-stop after 2 minutes max
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current)
+      }
+      maxRecordingTimeoutRef.current = setTimeout(() => {
+        console.log('⏰ Max recording time reached, stopping...')
+        stopListening()
+      }, 120000) // 2 minutes
+    }
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = ''
+      let interimTranscript = ''
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript
+        } else {
+          interimTranscript += transcript
         }
-        maxRecordingTimeoutRef.current = setTimeout(() => {
-          console.log('⏰ Max recording time reached, stopping...')
-          stopListening()
-        }, 120000) // 2 minutes
       }
 
-      recognition.onresult = (event: any) => {
-        let finalTranscript = ''
-        let interimTranscript = ''
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript
-          } else {
-            interimTranscript += transcript
+      if (finalTranscript) {
+        console.log('📝 Final transcript:', finalTranscript)
+        setCurrentResponse(prev => {
+          const newResponse = (prev + ' ' + finalTranscript).trim()
+          
+          // Clear and reset silence timeout on new speech
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current)
+            silenceTimeoutRef.current = null
           }
-        }
-
-        if (finalTranscript) {
-          console.log('📝 Final transcript:', finalTranscript)
-          setCurrentResponse(prev => {
-            const newResponse = (prev + ' ' + finalTranscript).trim()
-            
-            // Clear and reset silence timeout on new speech
-            if (silenceTimeoutRef.current) {
-              clearTimeout(silenceTimeoutRef.current)
-              silenceTimeoutRef.current = null
+          
+          // Auto-advance after 3 seconds of silence (or immediately on mobile)
+          const silenceDelay = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 1500 : 3000
+          silenceTimeoutRef.current = setTimeout(() => {
+            if (isListeningRef.current && 
+                !hiringManagerSpeakingRef.current && 
+                newResponse.trim() && 
+                sessionStartedRef.current) {
+              console.log('🔇 Silence detected, processing response:', newResponse.trim())
+              stopListening()
+              setTimeout(() => {
+                if (newResponse.trim()) {
+                  processUserResponse(newResponse.trim())
+                }
+              }, 500)
             }
-            
-            // Auto-advance after 3 seconds of silence
-            silenceTimeoutRef.current = setTimeout(() => {
-              if (isListeningRef.current && 
-                  !hiringManagerSpeakingRef.current && 
-                  newResponse.trim() && 
-                  sessionStartedRef.current) {
-                console.log('🔇 Silence detected, processing response:', newResponse.trim())
-                stopListening()
-                setTimeout(() => {
-                  if (newResponse.trim()) {
-                    processUserResponse(newResponse.trim())
-                  }
-                }, 500)
-              }
-            }, 3000)
-            
-            return newResponse
-          })
-        }
+          }, silenceDelay)
+          
+          return newResponse
+        })
       }
+    }
 
-      recognition.onend = () => {
-        console.log('🎤 Speech recognition ended')
-        setIsRecording(false)
-        
-        if (isListeningRef.current && sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
-          console.log('🔄 Restarting speech recognition...')
-          setTimeout(() => {
-            if (isListeningRef.current) {
-              startListening()
-            }
-          }, 100)
-        }
+    recognition.onend = () => {
+      console.log('🎤 Speech recognition ended')
+      setIsRecording(false)
+      
+      // Mobile devices often end recognition automatically, so restart if needed
+      if (isListeningRef.current && sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
+        console.log('🔄 Restarting speech recognition...')
+        setTimeout(() => {
+          if (isListeningRef.current) {
+            startListening()
+          }
+        }, 100)
       }
+    }
 
-      recognition.onerror = (event: any) => {
-        console.error('❌ Speech recognition error:', event.error)
-        setIsListening(false)
-        setIsRecording(false)
-        stopTurnTimer()
-        
-        if (event.error === 'no-speech') {
+    recognition.onerror = (event: any) => {
+      console.error('❌ Speech recognition error:', event.error)
+      setIsListening(false)
+      setIsRecording(false)
+      stopTurnTimer()
+      
+      // Enhanced error handling for mobile
+      switch (event.error) {
+        case 'no-speech':
           console.log('⚠️ No speech detected, will retry...')
           setTimeout(() => {
             if (sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
               startListening()
             }
           }, 1000)
-        }
+          break
+        case 'audio-capture':
+          console.error('❌ Audio capture error - check microphone permissions')
+          alert('Microphone access is required for voice practice. Please check your browser permissions.')
+          break
+        case 'not-allowed':
+          console.error('❌ Microphone permission denied')
+          alert('Microphone permission is required for voice practice. Please allow microphone access and try again.')
+          break
+        case 'network':
+          console.error('❌ Network error during speech recognition')
+          alert('Network error occurred. Please check your internet connection and try again.')
+          break
+        default:
+          console.error('❌ Speech recognition error:', event.error)
+          // Try to restart on other errors
+          setTimeout(() => {
+            if (sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
+              startListening()
+            }
+          }, 2000)
       }
+    }
 
-      try {
-        recognition.start()
-      } catch (error) {
-        console.error('❌ Error starting recognition:', error)
-        setIsListening(false)
-        setIsRecording(false)
-        stopTurnTimer()
-      }
-    } else {
-      console.error('❌ Speech recognition not supported')
-      alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.')
+    try {
+      recognition.start()
+    } catch (error) {
+      console.error('❌ Error starting recognition:', error)
+      setIsListening(false)
+      setIsRecording(false)
+      stopTurnTimer()
+      alert('Failed to start speech recognition. Please try again.')
     }
   }
 
@@ -2181,6 +2246,15 @@ function VoicePracticeMode({
   }
 
   const processUserResponse = (userMessage: string) => {
+    // Prevent duplicate processing
+    if (isProcessingResponseRef.current) {
+      console.log('⚠️ Already processing response, ignoring duplicate call')
+      return
+    }
+    
+    isProcessingResponseRef.current = true
+    console.log('🔄 Processing user response:', userMessage)
+    
     const turnDuration = stopTurnTimer()
     
     // Add user response to conversation with timing
@@ -2191,13 +2265,19 @@ function VoicePracticeMode({
       duration: turnDuration
     }
     
+    // Update conversation history and calculate turn count from the updated state
     setConversationHistory(prev => {
       const newHistory = [...prev, userResponse]
-      const currentUserTurnCount = newHistory.filter(h => h.speaker === 'user').length
+      const newUserTurnCount = newHistory.filter(h => h.speaker === 'user').length
+      console.log('DEBUG: newUserTurnCount =', newUserTurnCount)
       
-      // Generate AI response based on negotiation focus and analysis
+      // Generate AI response with the correct turn count
       setTimeout(() => {
-        generateEnhancedHiringManagerResponse(userMessage, turnDuration, currentUserTurnCount)
+        generateEnhancedHiringManagerResponse(userMessage, turnDuration, newUserTurnCount)
+        // Reset processing flag after AI response
+        setTimeout(() => {
+          isProcessingResponseRef.current = false
+        }, 2000)
       }, 1500)
       
       return newHistory
@@ -2205,106 +2285,111 @@ function VoicePracticeMode({
     setCurrentResponse('')
   }
 
-  const generateEnhancedHiringManagerResponse = (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
-    let response = ''
-    const messageLower = userMessage.toLowerCase()
+  const generateEnhancedHiringManagerResponse = async (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
+    // Prevent duplicate calls with the same message and turn count
+    const callKey = `${userMessage}-${userTurnCount}`
+    if (lastResponseKeyRef.current === callKey) {
+      console.log('⚠️ Duplicate generateEnhancedHiringManagerResponse call detected, ignoring')
+      return
+    }
+    lastResponseKeyRef.current = callKey
     
     // Find the selected scenario to guide the conversation
     const selectedScenario = scenarios.find(s => s.title === voiceScenario)
-    const conversationTurn = userTurnCount - 1  // 0-indexed for first turn
+    const conversationTurn = userTurnCount - 1  // 0-indexed: 1st user message = turn 0, 2nd = turn 1, etc
     console.log('DEBUG: conversationTurn =', conversationTurn, 'userTurnCount =', userTurnCount)
-    // Generate scenario-specific responses based on the selected practice scenario
-    if (selectedScenario) {
-      switch (selectedScenario.id) {
-        case 'total_compensation':
-          if (conversationTurn === 0) {
-            // First response - acknowledge their total comp focus and explore priorities
-            if (messageLower.includes('salary') || messageLower.includes('base')) {
-              response = `I understand base salary is important to you. Let's look at the complete picture though - our total compensation includes base salary, performance bonus potential, and equity participation. What's your thinking on how you'd like to see these components balanced? Are you looking for more guaranteed cash compensation or interested in upside potential?`
-            } else if (messageLower.includes('bonus') || messageLower.includes('incentive')) {
-              response = `Great point about performance incentives. Our bonus structure is designed to reward strong performance. Based on your experience level, I think there's room to discuss both the target bonus percentage and the equity component. What kind of performance metrics are most motivating for you?`
-            } else if (messageLower.includes('equity') || messageLower.includes('stock')) {
-              response = `I'm glad you're thinking about equity - it shows you're interested in the long-term success of the company. Let me understand what equity means to you. Are you looking at it as a retention tool, wealth-building opportunity, or alignment with company success? This helps me structure the right package.`
-            } else {
-              response = `I appreciate you taking a holistic view of compensation. Let's break down what's most important to you. Are you primarily focused on maximizing the guaranteed components like base and signing bonus, or are you interested in upside potential through performance bonuses and equity?`
-            }
-          } else if (conversationTurn === 1) {
-            // Second response - negotiate specific components
-            response = `Based on what you've shared, I think we can work with that. I'm thinking we could increase the base salary by 8-10%, add a $15,000 signing bonus, and bump up the equity to 0.25%. That brings the total package value up significantly. How does that balance feel to you?`
-          } else {
-            // Closing response - finalize agreement
-            response = `Excellent! I think we've found a great balance. The enhanced base salary, signing bonus, and equity package really reflects your value and gives you both immediate and long-term upside. I'll get the updated offer prepared with these changes.`
-          }
-          break;
+    
+    // Build conversation context for ChatGPT
+    const conversationContext = conversationHistory
+      .slice(-6) // Last 6 messages for context
+      .map(entry => `${entry.speaker === 'user' ? 'Candidate' : 'Hiring Manager'}: ${entry.message}`)
+      .join('\n')
+    
+    // Create system prompt based on scenario and conversation turn
+    let systemPrompt = `You are an experienced hiring manager conducting a salary negotiation. You should be realistic, professional, but also protective of company budget. 
 
-        case 'benefits':
-          if (conversationTurn === 0) {
-            // First response - explore benefits priorities
-            if (messageLower.includes('health') || messageLower.includes('medical')) {
-              response = `Healthcare is definitely a priority. Our standard plan covers 90% of premiums, but I understand family coverage can be expensive. Are you looking at family coverage, or are there specific healthcare needs we should consider? We also have options for HSA contributions and wellness programs.`
-            } else if (messageLower.includes('retirement') || messageLower.includes('401k')) {
-              response = `Retirement planning is smart thinking. We currently offer a 4% match on 401k contributions. I know some companies do more, and I might have some flexibility there. Are you currently maxing out retirement contributions, and what kind of match would make a meaningful difference for you?`
-            } else if (messageLower.includes('vacation') || messageLower.includes('pto') || messageLower.includes('time off')) {
-              response = `Work-life balance is important to us too. Our standard is 3 weeks PTO plus holidays, but I understand everyone's situation is different. Are you looking for more time off, or is it about flexibility in how you use it? Some people prefer more vacation days, others want flexible personal days.`
-            } else if (messageLower.includes('development') || messageLower.includes('learning') || messageLower.includes('training')) {
-              response = `I love that you're thinking about professional growth. We want to invest in our people's development. What kind of professional development is most valuable to you? Conference attendance, online courses, certification programs, or internal training? I can work on getting you a dedicated learning budget.`
-            } else {
-              response = `Benefits can really make a difference in your overall experience. What aspects of our benefits package are most important to you and your family? Health coverage, retirement planning, time off, professional development - help me understand your priorities so I can see where we have flexibility.`
-            }
-          } else if (conversationTurn === 1) {
-            // Second response - offer specific enhancements
-            response = `That makes perfect sense. Here's what I can do: I'll upgrade you to our premium health plan with full family coverage, increase the 401k match to 6%, add an extra week of PTO, and set up a $4,000 annual professional development budget. How does that enhanced benefits package sound?`
-          } else {
-            // Closing response - finalize benefits agreement
-            response = `Perfect! These benefits enhancements really round out the package nicely. The improved health coverage, better retirement matching, extra PTO, and learning budget show our commitment to supporting you and your family. I'll get all of this documented in the updated offer.`
-          }
-          break;
+Key guidelines:
+- Be conversational and natural, not robotic
+- Show some resistance initially, but be willing to negotiate 
+- Make counteroffers when appropriate
+- Reference specific numbers when discussing compensation
+- Be more flexible as the conversation progresses if the candidate is reasonable
+- Don't give away everything at once - negotiate incrementally
+- If candidate is aggressive or unreasonable, push back appropriately
+- Keep responses to 2-3 sentences maximum for natural conversation flow
 
-        case 'general_practice':
-          if (conversationTurn === 0) {
-            // First response - open-ended, let user drive the conversation
-            if (messageLower.includes('salary') || messageLower.includes('compensation') || messageLower.includes('pay')) {
-              response = `Absolutely, let's talk compensation. I want to make sure we're competitive and fair. What aspects of the compensation package are you hoping to discuss? Are you looking at base salary, bonus potential, equity, or the overall package structure?`
-            } else if (messageLower.includes('benefit') || messageLower.includes('health') || messageLower.includes('vacation')) {
-              response = `Benefits are definitely important for the complete package. What specific benefits matter most to you? I have some flexibility in areas like health coverage, retirement matching, PTO, and professional development budgets.`
-            } else if (messageLower.includes('start') || messageLower.includes('date') || messageLower.includes('timeline')) {
-              response = `Timeline is definitely negotiable. What works best for your situation? Are you looking to start sooner, or do you need more time for transition? I can work with you on finding the right start date that works for everyone.`
-            } else if (messageLower.includes('remote') || messageLower.includes('location') || messageLower.includes('flexible') || messageLower.includes('work from home') || messageLower.includes('hybrid')) {
-              response = `Work arrangements are something we can definitely discuss. We're pretty flexible on how our team works best. What kind of setup would be ideal for you? Remote work, hybrid schedule, or specific location considerations - I'm open to finding something that works well for both you and the team.`
-            } else {
-              response = `I appreciate you being thoughtful about this decision. What's the most important factor for you in making this work? Whether it's compensation, benefits, work arrangements, or timeline - let's focus on what matters most to you first.`
-            }
-          } else if (conversationTurn === 1) {
-            // Second response - be flexible and collaborative
-            response = `I really appreciate how you've approached this conversation. Based on what you've shared, I think I can work with most of what you're asking for. Let me see what I can do on the key points you've raised. I want to find a solution that works well for both of us.`
-          } else {
-            // Closing response - positive conclusion
-            response = `This has been a great discussion! I'm confident we can put together a package that addresses your main concerns and shows how much we value having you join the team. I'll work on getting the updated offer together with the changes we've discussed.`
-          }
-          break;
+Scenario context: ${selectedScenario?.title || 'General negotiation'}
+Conversation turn: ${conversationTurn + 1}
+${selectedScenario?.description ? `Scenario details: ${selectedScenario.description}` : ''}
 
-        default:
-          // Fallback for any unmatched scenarios
-          response = `I appreciate you bringing that up. Let me understand your perspective better so we can work through this together. Can you tell me more about what's most important to you in this negotiation?`
+Recent conversation:
+${conversationContext}
+
+Current candidate message: ${userMessage}
+
+Respond as the hiring manager would in this negotiation:`
+
+    try {
+      console.log('🤖 Generating AI response for:', userMessage.substring(0, 100))
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user', 
+              content: userMessage
+            }
+          ],
+          temperature: 0.8, // More creative/varied responses
+          max_tokens: 150   // Keep responses concise
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
       }
-    } else {
-      // Fallback response if no scenario is selected
-      response = `I appreciate you bringing that up. Let me understand your perspective better so we can work through this together. Can you tell me more about what's most important to you in this negotiation?`
+
+      const data = await response.json()
+      const aiResponse = data.choices?.[0]?.message?.content || "I appreciate your perspective. Let me think about what we can do here."
+      
+      console.log('🤖 AI Response generated:', aiResponse.substring(0, 100))
+      
+      const hiringManagerMessage = {
+        speaker: 'hiring_manager' as const,
+        message: aiResponse,
+        timestamp: new Date().toISOString(),
+        duration: 0
+      }
+      
+      setConversationHistory(prev => [...prev, hiringManagerMessage])
+      
+      // Speak the response immediately
+      speakHiringManagerMessage(aiResponse)
+      
+    } catch (error) {
+      console.error('Error generating AI response:', error)
+      
+      // Fallback response if API fails
+      const fallbackResponse = "I understand your position. Let me see what flexibility we have and get back to you on this."
+      
+      const hiringManagerMessage = {
+        speaker: 'hiring_manager' as const,
+        message: fallbackResponse,
+        timestamp: new Date().toISOString(),
+        duration: 0
+      }
+      
+      setConversationHistory(prev => [...prev, hiringManagerMessage])
+      speakHiringManagerMessage(fallbackResponse)
     }
-    
-    const hiringManagerMessage = {
-      speaker: 'hiring_manager' as const,
-      message: response,
-      timestamp: new Date().toISOString(),
-      duration: 0
-    }
-    
-    setConversationHistory(prev => [...prev, hiringManagerMessage])
-    
-    // Speak the response
-    setTimeout(() => {
-      speakHiringManagerMessage(response)
-    }, 500)
   }
 
   const endSession = () => {

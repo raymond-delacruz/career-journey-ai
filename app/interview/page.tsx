@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { LiveKitRoom, AudioConference, RoomAudioRenderer } from '@livekit/components-react'
 import { Room } from 'livekit-client'
@@ -148,14 +148,16 @@ function InterviewPageContent() {
   // Check if current stage is SQL Test
   const isSqlTest = stage === 'SQL Test'
   
-  // Debug logging for SQL Test detection
-  console.log('🔍 SQL Test Debug:', {
-    stage,
-    isSqlTest,
-    jobTitle,
-    level,
-    companyStage
-  })
+  // Debug logging for SQL Test detection - only log once when stage changes
+  useEffect(() => {
+    console.log('🔍 SQL Test Debug:', {
+      stage,
+      isSqlTest,
+      jobTitle,
+      level,
+      companyStage
+    })
+  }, [stage]) // Only depend on stage to prevent infinite loops
 
   // Timer utility functions
   const formatTime = (seconds: number): string => {
@@ -971,11 +973,20 @@ function InterviewPageContent() {
         
         if (event.error === 'no-speech') {
           console.log('⚠️ No speech detected, will retry...')
-          setTimeout(() => {
-            if (isInterviewStarted && !botIsSpeakingRef.current) {
-              startListening()
-            }
-          }, 1000)
+          // Only retry if we're still in an active interview and not already retrying
+          if (isInterviewStarted && !botIsSpeakingRef.current && isListeningRef.current) {
+            setTimeout(() => {
+              if (isInterviewStarted && !botIsSpeakingRef.current && isListeningRef.current) {
+                startListening()
+              }
+            }, 2000) // Increased delay to prevent rapid retries
+          }
+        } else if (event.error === 'aborted') {
+          // Recognition was intentionally stopped, don't retry
+          console.log('🛑 Speech recognition was stopped intentionally')
+        } else {
+          // For other errors, log but don't automatically retry
+          console.log('⚠️ Speech recognition error, not retrying automatically:', event.error)
         }
       }
 
@@ -983,13 +994,18 @@ function InterviewPageContent() {
         console.log('🎤 Speech recognition ended')
         setIsRecording(false)
         
-        if (isListeningRef.current && isInterviewStarted && !botIsSpeakingRef.current) {
+        // Only restart if we're still supposed to be listening and in an active interview
+        if (isListeningRef.current && isInterviewStarted && !botIsSpeakingRef.current && !isInterviewComplete) {
           console.log('🔄 Restarting speech recognition...')
           setTimeout(() => {
-            if (isListeningRef.current) {
+            // Double-check conditions before restarting
+            if (isListeningRef.current && isInterviewStarted && !botIsSpeakingRef.current && !isInterviewComplete) {
               startListening()
             }
-          }, 100)
+          }, 500) // Reduced delay but still prevent rapid restarts
+        } else {
+          console.log('🛑 Not restarting speech recognition - conditions not met')
+          setIsListening(false)
         }
       }
 
