@@ -2813,7 +2813,7 @@ ${shouldClose ?
       responseQuality: Math.round(responseQuality),
       conversationHistory: conversationHistory,
       structuredFeedback: null, // Will be populated by AI analysis
-      negotiationOutcome: null // Will be populated if outcome is recorded
+      negotiationOutcome: null as any // Will be populated if outcome is recorded
     }
 
     // Generate structured feedback using AI
@@ -3448,49 +3448,6 @@ ${shouldClose ?
                     Based on 15-45 second optimal response window
                   </p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Performance Insights - Enhanced with Structured Feedback */}
-          <div className="space-y-4 mb-6">
-            {/* Communication Quality */}
-            <div className="bg-green-50 rounded-lg p-4">
-              <h4 className="font-semibold text-green-800 mb-3">🎯 Communication Quality</h4>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-600">Response Timing</span>
-                    <span className="text-sm font-medium">{sessionSummary.responseQuality}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${
-                        sessionSummary.responseQuality >= 80 ? 'bg-green-500' :
-                        sessionSummary.responseQuality >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${sessionSummary.responseQuality}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Based on 15-45 second optimal response window
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Negotiation Focus */}
-            <div className="bg-purple-50 rounded-lg p-4">
-              <h4 className="font-semibold text-purple-800 mb-3">🎨 Focus Areas</h4>
-              <div className="space-y-2">
-                {sessionSummary.negotiationTopics.map((topicId: string) => {
-                  const topic = availableNegotiationFoci.find(f => f.id === topicId)
-                  return topic ? (
-                    <div key={topicId} className="bg-white rounded px-2 py-1 text-xs">
-                      {topic.label}
-                    </div>
-                  ) : null
-                })}
               </div>
             </div>
           </div>
