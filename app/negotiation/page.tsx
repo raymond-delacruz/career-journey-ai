@@ -1509,29 +1509,6 @@ Best regards,
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Email Client Interface */}
-            <div className="border rounded-lg bg-gray-50">
-              {/* Email Client Header */}
-              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">Negotiation Practice - Inbox</span>
-                </div>
-                <div className="text-xs text-gray-500">
-                  {emailThread.length} messages
-                </div>
-              </div>
-
-              {/* Email Thread - Removed redundant conversation history display */}
-              <div className="p-4 text-center text-gray-500 text-sm">
-                <p>📧 Email conversation continues in the composer below</p>
-              </div>
-            </div>
-
             {/* Email Composer */}
             <div className="border rounded-lg bg-white">
               <div className="bg-gray-50 px-4 py-2 border-b">
@@ -1834,19 +1811,6 @@ Best regards,
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Email Conversation</h3>
-          <button
-            onClick={() => setIsEmailPracticeActive(false)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1885,7 +1849,7 @@ function VoicePracticeMode({
       setTotalSessionTime(elapsed)
     }, 1000)
   }
-  
+
   const startTurnTimer = () => {
     console.log('⏰ Turn timer started')
     const startTime = Date.now()
@@ -1894,7 +1858,7 @@ function VoicePracticeMode({
       setCurrentTurnTime(elapsed)
     }, 1000)
   }
-  
+
   const stopTurnTimer = () => {
     console.log('⏰ Turn timer stopped')
     if (turnTimerRef.current) {
@@ -2362,7 +2326,7 @@ Keep it conversational and under 50 words.`
 
     // Start turn timer when user starts speaking
     startTurnTimer()
-    
+
     if (!('webkitSpeechRecognition' in window)) {
       alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.')
       setIsListening(false)
@@ -2397,7 +2361,7 @@ Keep it conversational and under 50 words.`
 
       recognition.onresult = (event: any) => {
         let interimTranscript = ''
-        
+
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
@@ -2431,7 +2395,7 @@ Keep it conversational and under 50 words.`
           console.log('👤 No speech detected, continuing to listen...')
         } else {
           setIsListening(false)
-          setIsRecording(false)
+        setIsRecording(false)
         }
       }
 
@@ -2449,12 +2413,12 @@ Keep it conversational and under 50 words.`
         }
       }
 
-      recognition.start()
+        recognition.start()
       
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Error starting speech recognition:', error)
-      setIsListening(false)
-      setIsRecording(false)
+        setIsListening(false)
+        setIsRecording(false)
     }
   }
 
@@ -2663,14 +2627,14 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
       // Fallback response if API fails
       const fallbackResponse = "I understand your position. Let me see what flexibility we have and get back to you on this."
     
-      const hiringManagerMessage = {
-        speaker: 'hiring_manager' as const,
+    const hiringManagerMessage = {
+      speaker: 'hiring_manager' as const,
         message: fallbackResponse,
-        timestamp: new Date().toISOString(),
-        duration: 0
-      }
+      timestamp: new Date().toISOString(),
+      duration: 0
+    }
     
-      setConversationHistory(prev => [...prev, hiringManagerMessage])
+    setConversationHistory(prev => [...prev, hiringManagerMessage])
       speakHiringManagerMessage(fallbackResponse)
     }
   }
@@ -3484,7 +3448,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
 
             {/* Negotiation Results or Session Stats */}
             {sessionSummary.negotiationOutcome ? (
-              <div className="bg-green-50 rounded-lg p-4">
+            <div className="bg-green-50 rounded-lg p-4">
                 <h4 className="font-semibold text-green-800 mb-3">💰 Negotiation Results</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -3504,7 +3468,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                       ${sessionSummary.negotiationOutcome.dollarIncrease.toLocaleString()} 
                       ({sessionSummary.negotiationOutcome.percentIncrease > 0 ? '+' : ''}{sessionSummary.negotiationOutcome.percentIncrease}%)
                     </span>
-                  </div>
+                </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Status:</span>
                     <span className={`font-medium capitalize ${
@@ -3514,7 +3478,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                     }`}>
                       {sessionSummary.negotiationOutcome.negotiationStatus.replace('_', ' ')}
                     </span>
-                  </div>
+              </div>
                   {sessionSummary.negotiationOutcome.otherBenefits.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-green-200">
                       <span className="text-gray-600 text-xs">Other Benefits:</span>
@@ -3550,7 +3514,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                 </div>
               </div>
             )}
-          </div>
+            </div>
 
           {/* Performance Insights - Enhanced with Structured Feedback */}
           <div className="space-y-4 mb-6">
@@ -3679,7 +3643,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                 </ul>
               </div>
             </div>
-              </div>
+          </div>
             )}
           </div>
 
