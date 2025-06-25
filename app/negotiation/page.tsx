@@ -1587,13 +1587,13 @@ Best regards,
                       Clear
                     </button>
                     <div className="flex gap-2">
-                      <button
-                        onClick={sendEmail}
-                        disabled={!currentEmailDraft.trim()}
+                    <button
+                      onClick={sendEmail}
+                      disabled={!currentEmailDraft.trim()}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
+                    >
                         Send Email
-                      </button>
+                    </button>
                       <button
                         onClick={() => setIsEmailPracticeActive(false)}
                         className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
@@ -2266,7 +2266,7 @@ function VoicePracticeMode({
     startTurnTimer()
 
     // Enhanced speech recognition with better mobile support
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
     
     if (!SpeechRecognition) {
       console.error('❌ Speech recognition not supported')
@@ -2277,13 +2277,13 @@ function VoicePracticeMode({
       return
     }
 
-    const recognition = new SpeechRecognition()
-    recognitionRef.current = recognition
+      const recognition = new SpeechRecognition()
+      recognitionRef.current = recognition
 
     // Enhanced settings for better mobile compatibility
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
     recognition.maxAlternatives = 1
     
     // Mobile-specific optimizations
@@ -2293,87 +2293,87 @@ function VoicePracticeMode({
       recognition.interimResults = false // Reduce processing load
     }
 
-    recognition.onstart = () => {
-      console.log('🎤 Speech recognition started')
-      setIsRecording(true)
-      
-      // Auto-stop after 2 minutes max
-      if (maxRecordingTimeoutRef.current) {
-        clearTimeout(maxRecordingTimeoutRef.current)
+      recognition.onstart = () => {
+        console.log('🎤 Speech recognition started')
+        setIsRecording(true)
+        
+        // Auto-stop after 2 minutes max
+        if (maxRecordingTimeoutRef.current) {
+          clearTimeout(maxRecordingTimeoutRef.current)
+        }
+        maxRecordingTimeoutRef.current = setTimeout(() => {
+          console.log('⏰ Max recording time reached, stopping...')
+          stopListening()
+        }, 120000) // 2 minutes
       }
-      maxRecordingTimeoutRef.current = setTimeout(() => {
-        console.log('⏰ Max recording time reached, stopping...')
-        stopListening()
-      }, 120000) // 2 minutes
-    }
 
-    recognition.onresult = (event: any) => {
-      let finalTranscript = ''
-      let interimTranscript = ''
+      recognition.onresult = (event: any) => {
+        let finalTranscript = ''
+        let interimTranscript = ''
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript
-        } else {
-          interimTranscript += transcript
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        if (finalTranscript) {
+          console.log('📝 Final transcript:', finalTranscript)
+          setCurrentResponse(prev => {
+            const newResponse = (prev + ' ' + finalTranscript).trim()
+            
+            // Clear and reset silence timeout on new speech
+            if (silenceTimeoutRef.current) {
+              clearTimeout(silenceTimeoutRef.current)
+              silenceTimeoutRef.current = null
+            }
+            
+          // Auto-advance after 3 seconds of silence (or immediately on mobile)
+          const silenceDelay = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 1500 : 3000
+            silenceTimeoutRef.current = setTimeout(() => {
+              if (isListeningRef.current && 
+                  !hiringManagerSpeakingRef.current && 
+                  newResponse.trim() && 
+                  sessionStartedRef.current) {
+                console.log('🔇 Silence detected, processing response:', newResponse.trim())
+                stopListening()
+                setTimeout(() => {
+                  if (newResponse.trim()) {
+                    processUserResponse(newResponse.trim())
+                  }
+                }, 500)
+              }
+          }, silenceDelay)
+            
+            return newResponse
+          })
         }
       }
 
-      if (finalTranscript) {
-        console.log('📝 Final transcript:', finalTranscript)
-        setCurrentResponse(prev => {
-          const newResponse = (prev + ' ' + finalTranscript).trim()
-          
-          // Clear and reset silence timeout on new speech
-          if (silenceTimeoutRef.current) {
-            clearTimeout(silenceTimeoutRef.current)
-            silenceTimeoutRef.current = null
-          }
-          
-          // Auto-advance after 3 seconds of silence (or immediately on mobile)
-          const silenceDelay = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 1500 : 3000
-          silenceTimeoutRef.current = setTimeout(() => {
-            if (isListeningRef.current && 
-                !hiringManagerSpeakingRef.current && 
-                newResponse.trim() && 
-                sessionStartedRef.current) {
-              console.log('🔇 Silence detected, processing response:', newResponse.trim())
-              stopListening()
-              setTimeout(() => {
-                if (newResponse.trim()) {
-                  processUserResponse(newResponse.trim())
-                }
-              }, 500)
-            }
-          }, silenceDelay)
-          
-          return newResponse
-        })
-      }
-    }
-
-    recognition.onend = () => {
-      console.log('🎤 Speech recognition ended')
-      setIsRecording(false)
-      
+      recognition.onend = () => {
+        console.log('🎤 Speech recognition ended')
+        setIsRecording(false)
+        
       // Mobile devices often end recognition automatically, so restart if needed
-      if (isListeningRef.current && sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
-        console.log('🔄 Restarting speech recognition...')
-        setTimeout(() => {
-          if (isListeningRef.current) {
-            startListening()
-          }
-        }, 100)
+        if (isListeningRef.current && sessionStartedRef.current && !hiringManagerSpeakingRef.current) {
+          console.log('🔄 Restarting speech recognition...')
+          setTimeout(() => {
+            if (isListeningRef.current) {
+              startListening()
+            }
+          }, 100)
+        }
       }
-    }
 
-    recognition.onerror = (event: any) => {
-      console.error('❌ Speech recognition error:', event.error)
-      setIsListening(false)
-      setIsRecording(false)
-      stopTurnTimer()
-      
+      recognition.onerror = (event: any) => {
+        console.error('❌ Speech recognition error:', event.error)
+        setIsListening(false)
+        setIsRecording(false)
+        stopTurnTimer()
+        
       // Enhanced error handling for mobile
       switch (event.error) {
         case 'no-speech':
@@ -2404,16 +2404,16 @@ function VoicePracticeMode({
               startListening()
             }
           }, 2000)
+        }
       }
-    }
 
-    try {
-      recognition.start()
-    } catch (error) {
-      console.error('❌ Error starting recognition:', error)
-      setIsListening(false)
-      setIsRecording(false)
-      stopTurnTimer()
+      try {
+        recognition.start()
+      } catch (error) {
+        console.error('❌ Error starting recognition:', error)
+        setIsListening(false)
+        setIsRecording(false)
+        stopTurnTimer()
       alert('Failed to start speech recognition. Please try again.')
     }
   }
@@ -2485,74 +2485,42 @@ function VoicePracticeMode({
   }
 
   const generateEnhancedHiringManagerResponse = async (userMessage: string, userTurnDuration: number, userTurnCount: number) => {
-    // Determine conversation context and stage
-    const conversationTurn = conversationHistory.filter(h => h.speaker === 'user').length
-    const conversationContext = conversationHistory
-      .slice(-4)
-      .map(h => `${h.speaker}: ${h.message}`)
-      .join('\n')
+    // Check if already generating to prevent duplicates
+    if (hiringManagerSpeakingRef.current) {
+      console.log('⚠️ Already generating response, skipping duplicate call')
+      return
+    }
+
+    const conversationTurn = userTurnCount
+    const shouldMoveTowardResolution = conversationTurn >= 3
+    const shouldOffer = conversationTurn <= 3
+    const shouldClose = conversationTurn >= 6
     
-    const selectedScenario = scenarios.find(s => s.title === voiceScenario) || scenarios[0]
-    
-    // Analyze conversation progress to determine if we should move toward resolution
-    const shouldMoveTowardResolution = conversationTurn >= 5 && Math.random() > 0.4
-    const shouldOffer = conversationTurn >= 3 && userMessage.toLowerCase().includes('salary') || 
-                       userMessage.toLowerCase().includes('offer') ||
-                       userMessage.toLowerCase().includes('compensation') ||
-                       userMessage.toLowerCase().includes('consider')
-    
-    const shouldClose = conversationTurn >= 7 || 
-                       userMessage.toLowerCase().includes('deal') ||
-                       userMessage.toLowerCase().includes('accept') ||
-                       userMessage.toLowerCase().includes('agree')
+    const systemPrompt = `You are a professional hiring manager conducting a salary negotiation. Keep responses natural, realistic, and under 40 words.
 
-    let systemPrompt = `You are a professional hiring manager in a salary negotiation. 
+Current offer details:
+- Position: ${analysis?.position || 'Software Engineer'}
+- Base Salary: $${analysis?.baseSalary || 100000}
+- Company: ${analysis?.company || 'TechCorp'}
 
-IMPORTANT: This negotiation should feel realistic and come to a natural conclusion. Based on the conversation stage:
-- Turn ${conversationTurn + 1} of negotiation
-- ${shouldMoveTowardResolution ? 'MOVE TOWARD RESOLUTION - Start making concrete offers or decisions' : 'Continue exploring and discussing'}
-- ${shouldOffer ? 'MAKE A SPECIFIC OFFER or COUNTEROFFER with numbers' : 'Focus on understanding needs and building rapport'}
-- ${shouldClose ? 'CLOSE THE NEGOTIATION with a final decision (accept, reject, or need time to decide)' : 'Keep the conversation flowing naturally'}
+Guidelines:
+- Turn ${conversationTurn}: ${shouldMoveTowardResolution ? 'Start moving toward resolution' : 'Explore candidate needs'}
+- ${shouldOffer ? 'Make specific counteroffers when appropriate' : 'Focus on finding middle ground'}
+- ${shouldClose ? 'Aim to conclude negotiation naturally' : 'Continue discussion'}
+- Use specific numbers for salary/benefits when making offers
+- Be professional but decisive
+- If candidate accepts or negotiation reaches natural end, conclude professionally
 
-Your personality:
-- Professional but human
-- Willing to negotiate within reason
-- Have real constraints and budgets
-- Want to find win-win solutions
-- Make concrete offers when appropriate
-- Can say "no" to unreasonable requests
-- Will end negotiations naturally when appropriate
+Conversation so far:
+${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n')}
 
-Negotiation Guidelines:
-- Keep responses to 2-3 sentences maximum for natural conversation flow
-- If turn >= 5: Start making specific offers or counteroffers with actual numbers
-- If turn >= 7: Move toward final decision (accept, counter, or decline)
-- If they ask for salary increases, provide specific amounts: "I can offer $X" or "Our budget allows for $Y"
-- If discussing benefits, be specific: "We can add 2 extra vacation days" or "I can approve a $2000 professional development budget"
-- End with clear next steps or final decisions when appropriate
-
-Current offer context: Base salary ${analysis?.baseSalary || 'not specified'}
-Market range: ${analysis?.marketRange?.min || 'unknown'} - ${analysis?.marketRange?.max || 'unknown'}
-
-Scenario context: ${selectedScenario?.title || 'General negotiation'}
-Conversation turn: ${conversationTurn + 1}
-${selectedScenario?.description ? `Scenario details: ${selectedScenario.description}` : ''}
-
-Recent conversation:
-${conversationContext}
-
-Current candidate message: ${userMessage}
-
-${shouldClose ? 
-  'IMPORTANT: This should be one of the final exchanges. Provide a clear decision or final offer.' : 
-  shouldOffer ? 
-  'IMPORTANT: Make a specific, numerical offer or counteroffer.' : 
-  'Respond professionally as the hiring manager would in this negotiation:'
-}`
+'Respond professionally as the hiring manager would in this negotiation:'`
 
     try {
       console.log('🤖 Generating AI response for:', userMessage.substring(0, 100))
-      console.log(`📊 Conversation stage: Turn ${conversationTurn + 1}, Move to resolution: ${shouldMoveTowardResolution}, Should offer: ${shouldOffer}, Should close: ${shouldClose}`)
+      console.log(`📊 Conversation stage: Turn ${conversationTurn}, Move to resolution: ${shouldMoveTowardResolution}, Should offer: ${shouldOffer}, Should close: ${shouldClose}`)
+      
+      hiringManagerSpeakingRef.current = true // Prevent duplicates
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -2591,6 +2559,7 @@ ${shouldClose ?
         duration: 0
       }
       
+      // Add to conversation history (only once!)
       setConversationHistory(prev => [...prev, hiringManagerMessage])
       
       // Check if this response indicates negotiation completion
@@ -2600,6 +2569,7 @@ ${shouldClose ?
                                aiResponse.toLowerCase().includes('deal') ||
                                aiResponse.toLowerCase().includes('welcome aboard') ||
                                aiResponse.toLowerCase().includes('look forward to') ||
+                               aiResponse.toLowerCase().includes('thank you for considering') ||
                                (conversationTurn >= 8 && Math.random() > 0.6)
       
       // Auto-generate outcome if negotiation is naturally concluding
@@ -2607,57 +2577,94 @@ ${shouldClose ?
         console.log('🎯 Negotiation appears to be concluding, preparing outcome tracking...')
         setTimeout(() => {
           generateAutomaticOutcome(aiResponse, conversationTurn)
+          // Auto-end session after outcome is generated
+          setTimeout(() => {
+            endSession()
+          }, 3000)
         }, 2000) // Give user time to see the final response
       }
       
-      // Speak the response immediately
+      // Speak the response
       speakHiringManagerMessage(aiResponse)
       
     } catch (error) {
       console.error('Error generating AI response:', error)
       
+      // Reset speaking flag on error
+      hiringManagerSpeakingRef.current = false
+      
       // Fallback response if API fails
       const fallbackResponse = "I understand your position. Let me see what flexibility we have and get back to you on this."
-      
+    
       const hiringManagerMessage = {
         speaker: 'hiring_manager' as const,
         message: fallbackResponse,
         timestamp: new Date().toISOString(),
         duration: 0
       }
-      
-      // Remove duplicate setConversationHistory call - only keep one
+    
       setConversationHistory(prev => [...prev, hiringManagerMessage])
       speakHiringManagerMessage(fallbackResponse)
     }
   }
 
   const generateAutomaticOutcome = (finalResponse: string, turnCount: number) => {
-    // Analyze the final response to determine outcome
+    console.log('🎯 Generating automatic negotiation outcome...')
+    
+    // Analyze the entire conversation to determine outcome
+    const allMessages = conversationHistory.map(h => h.message.toLowerCase()).join(' ')
     const lowerResponse = finalResponse.toLowerCase()
+    
+    // Determine success status based on language patterns
     const isSuccessful = lowerResponse.includes('accept') || 
                         lowerResponse.includes('deal') || 
                         lowerResponse.includes('agree') ||
                         lowerResponse.includes('welcome') ||
-                        lowerResponse.includes('look forward')
+                        lowerResponse.includes('look forward') ||
+                        lowerResponse.includes('excited') ||
+                        lowerResponse.includes('offer you') ||
+                        allMessages.includes('sounds good') ||
+                        allMessages.includes('works for me')
     
     const isRejected = lowerResponse.includes('cannot') ||
                       lowerResponse.includes('unable') ||
-                      lowerResponse.includes('budget') ||
-                      lowerResponse.includes('policy')
+                      lowerResponse.includes('budget constraints') ||
+                      lowerResponse.includes('policy') ||
+                      lowerResponse.includes('best we can do') ||
+                      lowerResponse.includes('final offer')
     
-    // Extract any salary numbers mentioned in conversation
-    const salaryNumbers = conversationHistory
-      .map(h => h.message.match(/\$[\d,]+/g))
-      .flat()
-      .filter(Boolean)
-      .map(s => parseInt(s!.replace(/[$,]/g, '')))
-      .filter(n => n > 10000) // Filter out non-salary numbers
+    // Extract ALL salary numbers mentioned in conversation
+    const allConversationText = conversationHistory.map(h => h.message).join(' ')
+    const salaryMatches = allConversationText.match(/\$[\d,]+(?:,\d{3})*(?:\.\d{2})?/g) || []
+    const salaryNumbers = salaryMatches
+      .map(s => parseInt(s.replace(/[$,]/g, '')))
+      .filter(n => n >= 30000 && n <= 1000000) // Realistic salary range
+      .sort((a, b) => b - a) // Sort highest to lowest
     
-    const originalSalary = Number(analysis?.baseSalary) || 0
-    const finalSalary = salaryNumbers.length > 0 ? 
-                       salaryNumbers[salaryNumbers.length - 1] : // Last mentioned salary
-                       originalSalary
+    console.log('💰 Salary numbers found in conversation:', salaryNumbers)
+    
+    const originalSalary = Number(analysis?.baseSalary) || 100000
+    
+    // Determine final salary intelligently
+    let finalSalary = originalSalary
+    
+    if (isSuccessful && salaryNumbers.length > 0) {
+      // If successful, take the highest reasonable salary mentioned
+      finalSalary = salaryNumbers[0]
+    } else if (isRejected && salaryNumbers.length > 1) {
+      // If rejected, they likely countered but it was rejected
+      finalSalary = originalSalary // Stick with original
+    } else if (salaryNumbers.length > 0) {
+      // If neutral/ongoing, take the most recent meaningful offer
+      const recentSalaries = salaryNumbers.slice(0, 2)
+      finalSalary = recentSalaries[0] || originalSalary
+    }
+    
+    // Ensure final salary is reasonable
+    if (finalSalary < originalSalary * 0.8 || finalSalary > originalSalary * 1.5) {
+      console.log('🚨 Final salary seems unrealistic, capping at reasonable range')
+      finalSalary = Math.min(Math.max(finalSalary, originalSalary * 0.9), originalSalary * 1.3)
+    }
     
     const outcome = {
       originalSalary,
@@ -2670,12 +2677,11 @@ ${shouldClose ?
                          isRejected ? 'unsuccessful' : 'ended') as 'successful' | 'unsuccessful' | 'ended'
     }
     
+    console.log('📊 Generated negotiation outcome:', outcome)
     setNegotiationOutcome(outcome)
     
-    // Show outcome input for manual adjustment
-    setTimeout(() => {
-      setShowOutcomeInput(true)
-    }, 1000)
+    // Don't show manual input - make it fully automated
+    // The outcome is now automatically captured and will be displayed in the session summary
   }
 
   const extractBenefitsFromConversation = (): string[] => {
@@ -2785,40 +2791,46 @@ ${shouldClose ?
   }
 
   const generateSessionSummary = (sessionTime: number) => {
-    const userTurns = conversationHistory.filter(h => h.speaker === 'user')
-    const avgResponseTime = userTurns.length > 0 
-      ? userTurns.reduce((sum, turn) => sum + (turn.duration || 0), 0) / userTurns.length 
-      : 0
-
-    // Calculate negotiation effectiveness
-    const totalWords = userTurns.reduce((sum, turn) => sum + (turn.message?.split(' ').length || 0), 0)
-    const avgWordsPerResponse = userTurns.length > 0 ? totalWords / userTurns.length : 0
-    
-    // Analyze response quality based on timing and content
-    const wellTimedResponses = userTurns.filter(turn => 
-      turn.duration && turn.duration >= 15 && turn.duration <= 45
-    ).length
-    
-    const responseQuality = userTurns.length > 0 ? (wellTimedResponses / userTurns.length) * 100 : 0
+    const userTurns = conversationHistory.filter(h => h.speaker === 'user').length
+    const totalTurns = conversationHistory.length
+    const averageResponseTime = userTurns > 0 ? sessionTime / userTurns : 0
 
     const summary = {
+      sessionDuration: sessionTime,
       totalTime: sessionTime,
-      totalTurns: conversationHistory.length,
-      userTurns: userTurns.length,
-      averageResponseTime: Math.round(avgResponseTime),
-      negotiationTopics: negotiationFocus,
-      completedAt: new Date().toISOString(),
+      totalTurns,
+      userTurns,
+      hiringManagerTurns: totalTurns - userTurns,
+      averageResponseTime: Math.round(averageResponseTime),
       scenario: voiceScenario,
-      averageWordsPerResponse: Math.round(avgWordsPerResponse),
-      responseQuality: Math.round(responseQuality),
-      conversationHistory: conversationHistory,
-      structuredFeedback: null, // Will be populated by AI analysis
-      negotiationOutcome: null as any // Will be populated if outcome is recorded
+      conversationHistory,
+      negotiationOutcome: negotiationOutcome, // Include the automatically generated outcome
+      timestamp: new Date().toISOString(),
+      
+      // Initialize feedback fields - will be populated by API call
+      structuredFeedback: null
     }
 
-    // Generate structured feedback using AI
-    if (conversationHistory.length > 2) {
+    console.log('📊 Session summary generated:', summary)
+
+    // Generate structured feedback using ChatGPT if we have conversation history
+    if (conversationHistory.length >= 2) {
+      console.log('🧠 Requesting structured feedback from ChatGPT...')
       generateStructuredFeedback(conversationHistory, summary)
+    } else {
+      // Fallback for very short conversations
+      const fallbackFeedback = {
+        strengths: ["You engaged in the negotiation practice"],
+        areasForImprovement: ["Try having a longer conversation to get more detailed feedback"],
+        nextSteps: ["Practice another scenario with more back-and-forth"],
+        overallScore: 6.0,
+        keyInsights: ["Longer conversations provide better practice opportunities"]
+      }
+      
+      setSessionSummary({
+        ...summary,
+        structuredFeedback: fallbackFeedback
+      })
     }
 
     return summary
@@ -2826,6 +2838,8 @@ ${shouldClose ?
 
   const generateStructuredFeedback = async (history: any[], summary: any) => {
     try {
+      console.log('🧠 Generating structured feedback for conversation with', history.length, 'messages')
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -2839,29 +2853,52 @@ ${shouldClose ?
       })
 
       if (!response.ok) {
+        console.error('❌ Feedback API request failed:', response.status)
         throw new Error('Failed to generate structured feedback')
       }
 
       const result = await response.json()
+      console.log('✅ Structured feedback received:', result.feedback)
       
       // Update the session summary with structured feedback
       setSessionSummary((prev: any) => ({
         ...prev,
+        ...summary, // Include the base summary data
         structuredFeedback: result.feedback
       }))
 
     } catch (error) {
-      console.error('Error generating structured feedback:', error)
-      // Fallback to basic feedback
+      console.error('❌ Error generating structured feedback:', error)
+      
+      // Enhanced fallback feedback
+      const fallbackFeedback = {
+        strengths: [
+          "You completed a full negotiation practice session",
+          "You engaged actively throughout the conversation",
+          "You maintained professional communication"
+        ],
+        areasForImprovement: [
+          "Continue practicing to build confidence in negotiations",
+          "Try exploring different negotiation strategies",
+          "Practice with various scenarios to improve adaptability"
+        ],
+        nextSteps: [
+          "Try negotiating different aspects of the offer",
+          "Practice with a different scenario",
+          "Focus on specific negotiation techniques"
+        ],
+        overallScore: 7.0,
+        keyInsights: [
+          "Regular practice builds negotiation confidence",
+          "Real-time conversation skills are developing",
+          "Voice practice helps prepare for actual negotiations"
+        ]
+      }
+      
       setSessionSummary((prev: any) => ({
         ...prev,
-        structuredFeedback: {
-          strengths: ["You completed a full negotiation practice session"],
-          areasForImprovement: ["Continue practicing to build confidence"],
-          nextSteps: ["Try negotiating different aspects of the offer"],
-          overallScore: 7.0,
-          keyInsights: ["Regular practice will improve your negotiation skills"]
-        }
+        ...summary, // Include the base summary data
+        structuredFeedback: fallbackFeedback
       }))
     }
   }
@@ -3448,9 +3485,9 @@ ${shouldClose ?
                     Based on 15-45 second optimal response window
                   </p>
                 </div>
+                </div>
               </div>
             </div>
-          </div>
 
           {/* Performance Insights - Enhanced with Structured Feedback */}
           <div className="space-y-4 mb-6">
@@ -3470,9 +3507,9 @@ ${shouldClose ?
                         'bg-red-100 text-red-800'
                       }`}>
                         {sessionSummary.structuredFeedback.overallScore}/10
-                      </div>
                     </div>
-                  </div>
+              </div>
+            </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Strengths */}
@@ -3488,7 +3525,7 @@ ${shouldClose ?
                           </li>
                         ))}
                       </ul>
-                    </div>
+          </div>
 
                     {/* Areas for Improvement */}
                     <div className="bg-white rounded-lg p-4 border border-orange-200">
@@ -3541,44 +3578,44 @@ ${shouldClose ?
               </>
             ) : (
               /* Fallback Performance Insights */
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3">💡 Performance Insights</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <h5 className="font-medium text-green-700 mb-2">✅ Strengths</h5>
-                    <ul className="space-y-1 text-gray-700">
-                      {sessionSummary.averageResponseTime >= 15 && sessionSummary.averageResponseTime <= 45 && (
-                        <li>• Good response timing - professional pace</li>
-                      )}
-                      {sessionSummary.averageWordsPerResponse >= 20 && (
-                        <li>• Detailed responses - good content depth</li>
-                      )}
-                      {sessionSummary.userTurns >= 3 && (
-                        <li>• Active engagement throughout session</li>
-                      )}
-                      {sessionSummary.negotiationTopics.length >= 2 && (
-                        <li>• Multi-faceted negotiation approach</li>
-                      )}
-                    </ul>
-                  </div>
-                  <div>
-                    <h5 className="font-medium text-orange-700 mb-2">🎯 Areas for Improvement</h5>
-                    <ul className="space-y-1 text-gray-700">
-                      {sessionSummary.averageResponseTime < 15 && (
-                        <li>• Consider taking more time to formulate responses</li>
-                      )}
-                      {sessionSummary.averageResponseTime > 45 && (
-                        <li>• Try to be more concise in your responses</li>
-                      )}
-                      {sessionSummary.averageWordsPerResponse < 15 && (
-                        <li>• Provide more detailed explanations and examples</li>
-                      )}
-                      {sessionSummary.userTurns < 3 && (
-                        <li>• Engage in longer practice sessions for better results</li>
-                      )}
-                    </ul>
-                  </div>
-                </div>
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <h4 className="font-semibold text-gray-800 mb-3">💡 Performance Insights</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <h5 className="font-medium text-green-700 mb-2">✅ Strengths</h5>
+                <ul className="space-y-1 text-gray-700">
+                  {sessionSummary.averageResponseTime >= 15 && sessionSummary.averageResponseTime <= 45 && (
+                    <li>• Good response timing - professional pace</li>
+                  )}
+                  {sessionSummary.averageWordsPerResponse >= 20 && (
+                    <li>• Detailed responses - good content depth</li>
+                  )}
+                  {sessionSummary.userTurns >= 3 && (
+                    <li>• Active engagement throughout session</li>
+                  )}
+                  {sessionSummary.negotiationTopics.length >= 2 && (
+                    <li>• Multi-faceted negotiation approach</li>
+                  )}
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-medium text-orange-700 mb-2">🎯 Areas for Improvement</h5>
+                <ul className="space-y-1 text-gray-700">
+                  {sessionSummary.averageResponseTime < 15 && (
+                    <li>• Consider taking more time to formulate responses</li>
+                  )}
+                  {sessionSummary.averageResponseTime > 45 && (
+                    <li>• Try to be more concise in your responses</li>
+                  )}
+                  {sessionSummary.averageWordsPerResponse < 15 && (
+                    <li>• Provide more detailed explanations and examples</li>
+                  )}
+                  {sessionSummary.userTurns < 3 && (
+                    <li>• Engage in longer practice sessions for better results</li>
+                  )}
+                </ul>
+              </div>
+            </div>
               </div>
             )}
           </div>
