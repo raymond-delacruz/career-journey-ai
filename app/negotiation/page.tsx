@@ -2470,14 +2470,17 @@ function VoicePracticeMode({
       const newUserTurnCount = newHistory.filter(h => h.speaker === 'user').length
       console.log('DEBUG: newUserTurnCount =', newUserTurnCount)
       
-      // Generate AI response with the correct turn count
-      setTimeout(() => {
-        generateEnhancedHiringManagerResponse(userMessage, turnDuration, newUserTurnCount)
-        // Reset processing flag after AI response
-        setTimeout(() => {
+      // Generate AI response with a short delay to prevent race conditions
+      setTimeout(async () => {
+        try {
+          await generateEnhancedHiringManagerResponse(userMessage, turnDuration, newUserTurnCount)
+        } catch (error) {
+          console.error('Error in generateEnhancedHiringManagerResponse:', error)
+        } finally {
+          // Reset processing flag after AI response completes
           isProcessingResponseRef.current = false
-        }, 2000)
-      }, 1500)
+        }
+      }, 500)
       
       return newHistory
     })
@@ -2491,10 +2494,14 @@ function VoicePracticeMode({
       return
     }
 
+    console.log('🤖 Generating AI response for:', userMessage.substring(0, 100))
+
     const conversationTurn = userTurnCount
     const shouldMoveTowardResolution = conversationTurn >= 3
     const shouldOffer = conversationTurn <= 3
     const shouldClose = conversationTurn >= 6
+    
+    console.log(`📊 Conversation stage: Turn ${conversationTurn}, Move to resolution: ${shouldMoveTowardResolution}, Should offer: ${shouldOffer}, Should close: ${shouldClose}`)
     
     const systemPrompt = `You are a professional hiring manager conducting a salary negotiation. Keep responses natural, realistic, and under 40 words.
 
@@ -2517,11 +2524,6 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
 'Respond professionally as the hiring manager would in this negotiation:'`
 
     try {
-      console.log('🤖 Generating AI response for:', userMessage.substring(0, 100))
-      console.log(`📊 Conversation stage: Turn ${conversationTurn}, Move to resolution: ${shouldMoveTowardResolution}, Should offer: ${shouldOffer}, Should close: ${shouldClose}`)
-      
-      hiringManagerSpeakingRef.current = true // Prevent duplicates
-      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -2584,14 +2586,11 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
         }, 2000) // Give user time to see the final response
       }
       
-      // Speak the response
+      // Speak the response - this will handle the speaking flag management
       speakHiringManagerMessage(aiResponse)
       
     } catch (error) {
       console.error('Error generating AI response:', error)
-      
-      // Reset speaking flag on error
-      hiringManagerSpeakingRef.current = false
       
       // Fallback response if API fails
       const fallbackResponse = "I understand your position. Let me see what flexibility we have and get back to you on this."
@@ -2795,6 +2794,23 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
     const totalTurns = conversationHistory.length
     const averageResponseTime = userTurns > 0 ? sessionTime / userTurns : 0
 
+    // Extract negotiation topics from conversation
+    const negotiationTopics = conversationHistory
+      .filter(h => h.speaker === 'user')
+      .map(h => h.message.toLowerCase())
+      .reduce((topics: string[], message: string) => {
+        if (message.includes('salary') || message.includes('pay')) topics.push('salary')
+        if (message.includes('benefits') || message.includes('vacation') || message.includes('insurance')) topics.push('benefits')
+        if (message.includes('remote') || message.includes('work from home') || message.includes('flexible')) topics.push('remote work')
+        if (message.includes('bonus') || message.includes('signing bonus')) topics.push('bonus')
+        if (message.includes('equity') || message.includes('stock') || message.includes('options')) topics.push('equity')
+        if (message.includes('title') || message.includes('role') || message.includes('position')) topics.push('role/title')
+        return topics
+      }, [])
+
+    // Remove duplicates
+    const uniqueTopics = Array.from(new Set(negotiationTopics))
+
     const summary = {
       sessionDuration: sessionTime,
       totalTime: sessionTime,
@@ -2802,7 +2818,13 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
       userTurns,
       hiringManagerTurns: totalTurns - userTurns,
       averageResponseTime: Math.round(averageResponseTime),
+      averageWordsPerResponse: Math.round(
+        conversationHistory
+          .filter(h => h.speaker === 'user')
+          .reduce((total, h) => total + h.message.split(' ').length, 0) / Math.max(userTurns, 1)
+      ),
       scenario: voiceScenario,
+      negotiationTopics: uniqueTopics, // Properly initialize this field
       conversationHistory,
       negotiationOutcome: negotiationOutcome, // Include the automatically generated outcome
       timestamp: new Date().toISOString(),
@@ -3593,7 +3615,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                   {sessionSummary.userTurns >= 3 && (
                     <li>• Active engagement throughout session</li>
                   )}
-                  {sessionSummary.negotiationTopics.length >= 2 && (
+                  {sessionSummary.negotiationTopics && sessionSummary.negotiationTopics.length >= 2 && (
                     <li>• Multi-faceted negotiation approach</li>
                   )}
                 </ul>

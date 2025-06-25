@@ -146,7 +146,24 @@ Be encouraging but honest. Provide concrete, actionable feedback that will help 
       
       try {
         const feedbackContent = completion.choices[0].message.content?.trim()
-        const structuredFeedback = JSON.parse(feedbackContent || '{}')
+        
+        // Clean the response to remove markdown code blocks and extract JSON
+        let cleanedContent = feedbackContent
+        if (cleanedContent?.includes('```')) {
+          const jsonMatch = cleanedContent.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
+          if (jsonMatch) {
+            cleanedContent = jsonMatch[1]
+          } else {
+            // If no proper JSON block found, try to extract everything between first { and last }
+            const startIndex = cleanedContent.indexOf('{')
+            const lastIndex = cleanedContent.lastIndexOf('}')
+            if (startIndex !== -1 && lastIndex !== -1 && lastIndex > startIndex) {
+              cleanedContent = cleanedContent.substring(startIndex, lastIndex + 1)
+            }
+          }
+        }
+        
+        const structuredFeedback = JSON.parse(cleanedContent || '{}')
         
         return NextResponse.json({
           feedback: structuredFeedback,
