@@ -42,6 +42,35 @@ export default function NegotiationCoach() {
   const [isVoicePracticeActive, setIsVoicePracticeActive] = useState(false)
   const [voiceScenario, setVoiceScenario] = useState('')
 
+  const [targetSalary, setTargetSalary] = useState(0)
+  const [showOutcomeInput, setShowOutcomeInput] = useState(false)
+
+  // Add back necessary refs and states that were removed but still used
+  const [liveKitToken, setLiveKitToken] = useState<any>(null)
+  const [liveKitRoom, setLiveKitRoom] = useState<any>(null)
+  const [isLiveKitConnected, setIsLiveKitConnected] = useState(false)
+  const [isHiringManagerSpeaking, setIsHiringManagerSpeaking] = useState(false)
+  const [sessionStarted, setSessionStarted] = useState(false)
+  const [liveKitError, setLiveKitError] = useState<string | null>(null)
+  const [currentResponse, setCurrentResponse] = useState('')
+  const [isRecording, setIsRecording] = useState(false)
+  const [isPreparingToListen, setIsPreparingToListen] = useState(false)
+  const [totalSessionTime, setTotalSessionTime] = useState(0)
+  const [currentTurnTime, setCurrentTurnTime] = useState(0)
+  const [turnStartTime, setTurnStartTime] = useState<Date | null>(null)
+  const [negotiationFocus, setNegotiationFocus] = useState<string[]>([])
+
+  const recognitionRef = useRef<any>(null)
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const maxRecordingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hiringManagerSpeakingRef = useRef(false)
+  const isListeningRef = useRef(false)
+  const sessionStartedRef = useRef(false)
+  const isProcessingResponseRef = useRef(false)
+  const lastResponseKeyRef = useRef<string | null>(null)
+  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const turnTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -454,6 +483,62 @@ export default function NegotiationCoach() {
       ...extractedData,
       [field]: value
     })
+  }
+
+  // Format time utility
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Start session timer
+  const startSessionTimer = () => {
+    const startTime = Date.now()
+    setSessionStartTime(startTime)
+    setTotalSessionTime(0)
+    
+    sessionTimerRef.current = setInterval(() => {
+      setTotalSessionTime(prev => prev + 1)
+    }, 1000)
+  }
+
+  // Stop session timer
+  const stopSessionTimer = (): number => {
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current)
+      sessionTimerRef.current = null
+    }
+    
+    const sessionTime = sessionStartTime 
+      ? Math.floor((Date.now() - sessionStartTime) / 1000)
+      : totalSessionTime
+    
+    return sessionTime
+  }
+
+  // Start turn timer
+  const startTurnTimer = () => {
+    setTurnStartTime(new Date())
+    setCurrentTurnTime(0)
+    
+    turnTimerRef.current = setInterval(() => {
+      setCurrentTurnTime(prev => prev + 1)
+    }, 1000)
+  }
+
+  // Stop turn timer and return duration
+  const stopTurnTimer = (): number => {
+    if (turnTimerRef.current) {
+      clearInterval(turnTimerRef.current)
+      turnTimerRef.current = null
+    }
+    
+    const turnTime = turnStartTime 
+      ? Math.floor((new Date().getTime() - turnStartTime.getTime()) / 1000)
+      : currentTurnTime
+    
+    return turnTime
   }
 
   return (
@@ -1120,6 +1205,8 @@ function EmailPracticeMode({
   setIsEmailPracticeActive 
 }: any) {
   const [conversationAnalysis, setConversationAnalysis] = useState<any>(null)
+  const [emailFeedback, setEmailFeedback] = useState<any>(null)
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   // Quick start email templates
@@ -1353,6 +1440,54 @@ Best regards,
     return `Thanks for your email. I appreciate you taking the time to share your thoughts. Let me discuss this internally and get back to you with next steps.\n\nBest regards,\nSarah Johnson`
   }
 
+  const generateEmailFeedback = async (emailThread: any[]) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Generate email feedback' }],
+          feedbackType: 'email',
+          emailThread: emailThread
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate feedback')
+      }
+
+      const data = await response.json()
+      return data.feedback
+    } catch (error) {
+      console.error('Error generating email feedback:', error)
+      // Return default feedback if API fails
+      return {
+        overallScore: 7,
+        strengths: [
+          "Professional communication style",
+          "Clear structure and organization",
+          "Appropriate tone for business context"
+        ],
+        areasForImprovement: [
+          "Could provide more specific examples",
+          "Consider adding supporting evidence",
+          "Timing of follow-up could be optimized"
+        ],
+        nextSteps: [
+          "Follow up professionally within 2-3 business days",
+          "Prepare additional supporting materials",
+          "Consider scheduling a call to discuss details"
+        ],
+        keyInsights: [
+          "Written communication requires careful attention to tone",
+          "Preparation and research strengthen your position"
+        ]
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-lg p-6">
@@ -1497,16 +1632,35 @@ Best regards,
                     >
                       Clear
                     </button>
-                    <button
-                      onClick={sendEmail}
-                      disabled={!currentEmailDraft.trim()}
-                      className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed text-sm flex items-center"
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2z" />
-                      </svg>
-                      Send
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={sendEmail}
+                        disabled={!currentEmailDraft.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Send Email
+                      </button>
+                      <button
+                        onClick={() => setIsEmailPracticeActive(false)}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                      >
+                        End Practice
+                      </button>
+                      {emailThread.length >= 2 && (
+                        <button
+                          onClick={async () => {
+                            setIsGeneratingFeedback(true)
+                            const feedback = await generateEmailFeedback(emailThread)
+                            setEmailFeedback(feedback)
+                            setIsGeneratingFeedback(false)
+                          }}
+                          disabled={isGeneratingFeedback}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isGeneratingFeedback ? 'Generating...' : 'Get AI Feedback'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1629,6 +1783,114 @@ Best regards,
           ) : null}
         </div>
       )}
+
+      {/* Email AI Feedback Section */}
+      {emailFeedback && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-800 flex items-center">
+              🤖 Email Negotiation Analysis
+            </h4>
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Overall Score:</span>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                emailFeedback.overallScore >= 8 ? 'bg-green-100 text-green-800' :
+                emailFeedback.overallScore >= 6 ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {emailFeedback.overallScore}/10
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Strengths */}
+            <div className="bg-white rounded-lg p-4 border border-green-200">
+              <h5 className="font-semibold text-green-800 mb-3 flex items-center">
+                ✅ What You Did Well
+              </h5>
+              <ul className="space-y-2">
+                {emailFeedback.strengths.map((strength: string, index: number) => (
+                  <li key={index} className="text-sm text-gray-700 flex items-start">
+                    <span className="text-green-600 mr-2 mt-1">•</span>
+                    <span>{strength}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Areas for Improvement */}
+            <div className="bg-white rounded-lg p-4 border border-orange-200">
+              <h5 className="font-semibold text-orange-800 mb-3 flex items-center">
+                🎯 Areas to Improve
+              </h5>
+              <ul className="space-y-2">
+                {emailFeedback.areasForImprovement.map((improvement: string, index: number) => (
+                  <li key={index} className="text-sm text-gray-700 flex items-start">
+                    <span className="text-orange-600 mr-2 mt-1">•</span>
+                    <span>{improvement}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Next Steps */}
+          <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
+            <h5 className="font-semibold text-blue-800 mb-3 flex items-center">
+              🚀 Your Next Steps
+            </h5>
+            <ul className="space-y-2">
+              {emailFeedback.nextSteps.map((step: string, index: number) => (
+                <li key={index} className="text-sm text-gray-700 flex items-start">
+                  <span className="text-blue-600 mr-2 mt-1">•</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Key Insights */}
+          {emailFeedback.keyInsights && emailFeedback.keyInsights.length > 0 && (
+            <div className="mt-4 bg-white rounded-lg p-4 border border-purple-200">
+              <h5 className="font-semibold text-purple-800 mb-3 flex items-center">
+                💡 Key Insights
+              </h5>
+              <ul className="space-y-2">
+                {emailFeedback.keyInsights.map((insight: string, index: number) => (
+                  <li key={index} className="text-sm text-gray-700 flex items-start">
+                    <span className="text-purple-600 mr-2 mt-1">•</span>
+                    <span>{insight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => setEmailFeedback(null)}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+            >
+              Close Feedback
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">Email Conversation</h3>
+          <button
+            onClick={() => setIsEmailPracticeActive(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1641,100 +1903,43 @@ function VoicePracticeMode({
   voiceScenario,
   setVoiceScenario
 }: any) {
-  const [liveKitToken, setLiveKitToken] = useState<any>(null)
-  const [liveKitRoom, setLiveKitRoom] = useState<any>(null)
-  const [isLiveKitConnected, setIsLiveKitConnected] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected')
   const [isListening, setIsListening] = useState(false)
-  const [currentResponse, setCurrentResponse] = useState('')
+  const [currentMessage, setCurrentMessage] = useState('')
   const [conversationHistory, setConversationHistory] = useState<Array<{
     speaker: 'user' | 'hiring_manager'
     message: string
     timestamp: string
-    duration?: number
+    turnDuration?: number
   }>>([])
-  const [isHiringManagerSpeaking, setIsHiringManagerSpeaking] = useState(false)
-  const [sessionStarted, setSessionStarted] = useState(false)
-  const [liveKitError, setLiveKitError] = useState<string | null>(null)
-  const [isPreparingToListen, setIsPreparingToListen] = useState(false)
-  
-  // Timer states
-  const [totalSessionTime, setTotalSessionTime] = useState(0) // Total session time in seconds
-  const [currentTurnTime, setCurrentTurnTime] = useState(0) // Time for current speaking turn
-  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
-  const [turnStartTime, setTurnStartTime] = useState<Date | null>(null)
-  const [negotiationFocus, setNegotiationFocus] = useState<string[]>([]) // What user wants to negotiate
-  
-  // Add session summary state
   const [sessionSummary, setSessionSummary] = useState<any>(null)
-  
-  const recognitionRef = useRef<any>(null)
-  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const maxRecordingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const hiringManagerSpeakingRef = useRef(false)
-  const isListeningRef = useRef(false)
-  const sessionStartedRef = useRef(false)
-  const isProcessingResponseRef = useRef(false)
-  const lastResponseKeyRef = useRef<string | null>(null)
-  
-  // Session timers
-  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const turnTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [isSessionActive, setIsSessionActive] = useState(false)
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null)
+  const [currentTurnStartTime, setCurrentTurnStartTime] = useState<number | null>(null)
+  const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const [userTurnCount, setUserTurnCount] = useState(0)
 
-  // Format time utility
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+  // New negotiation outcome tracking
+  const [negotiationOutcome, setNegotiationOutcome] = useState<{
+    originalSalary: number
+    finalSalary: number
+    percentIncrease: number
+    dollarIncrease: number
+    otherBenefits: string[]
+    negotiationStatus: 'in_progress' | 'successful' | 'unsuccessful' | 'ended'
+  }>({
+    originalSalary: analysis?.salaryInfo?.base || 0,
+    finalSalary: analysis?.salaryInfo?.base || 0,
+    percentIncrease: 0,
+    dollarIncrease: 0,
+    otherBenefits: [],
+    negotiationStatus: 'in_progress'
+  })
 
-  // Start session timer
-  const startSessionTimer = () => {
-    setSessionStartTime(new Date())
-    setTotalSessionTime(0)
-    
-    sessionTimerRef.current = setInterval(() => {
-      setTotalSessionTime(prev => prev + 1)
-    }, 1000)
-  }
-
-  // Stop session timer
-  const stopSessionTimer = (): number => {
-    if (sessionTimerRef.current) {
-      clearInterval(sessionTimerRef.current)
-      sessionTimerRef.current = null
-    }
-    
-    const sessionTime = sessionStartTime 
-      ? Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000)
-      : totalSessionTime
-    
-    return sessionTime
-  }
-
-  // Start turn timer
-  const startTurnTimer = () => {
-    setTurnStartTime(new Date())
-    setCurrentTurnTime(0)
-    
-    turnTimerRef.current = setInterval(() => {
-      setCurrentTurnTime(prev => prev + 1)
-    }, 1000)
-  }
-
-  // Stop turn timer and return duration
-  const stopTurnTimer = (): number => {
-    if (turnTimerRef.current) {
-      clearInterval(turnTimerRef.current)
-      turnTimerRef.current = null
-    }
-    
-    const turnTime = turnStartTime 
-      ? Math.floor((new Date().getTime() - turnStartTime.getTime()) / 1000)
-      : currentTurnTime
-    
-    return turnTime
-  }
+  const [targetSalary, setTargetSalary] = useState(0)
+  const [showOutcomeInput, setShowOutcomeInput] = useState(false)
 
   const scenarios = [
     {
@@ -2393,23 +2598,86 @@ Respond as the hiring manager would in this negotiation:`
   }
 
   const endSession = () => {
-    const finalSessionTime = stopSessionTimer()
+    console.log('🔴 Ending voice practice session')
     
-    // Generate session summary with timing analysis
-    const summary = generateSessionSummary(finalSessionTime)
+    // Stop all timers and recording
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current)
+      sessionTimerRef.current = null
+    }
+    
+    if (turnTimerRef.current) {
+      clearInterval(turnTimerRef.current)
+      turnTimerRef.current = null
+    }
+    
+    // Stop recognition if active
+    if (recognitionRef.current && isListening) {
+      try {
+        recognitionRef.current.stop()
+      } catch (error) {
+        console.log('Recognition already stopped')
+      }
+    }
+    
+    // Calculate session time
+    const sessionTime = stopSessionTimer()
+    
+    // Generate session summary
+    const summary = generateSessionSummary(sessionTime)
     setSessionSummary(summary)
     
-    setIsVoicePracticeActive(false)
+    // Reset states
+    setIsListening(false)
+    setIsHiringManagerSpeaking(false)
     setSessionStarted(false)
-    setConversationHistory([])
-    setCurrentResponse('')
-    stopListening()
+    sessionStartedRef.current = false
+    hiringManagerSpeakingRef.current = false
+    isListeningRef.current = false
     
-    if (liveKitRoom) {
-      liveKitRoom.disconnect()
-      setLiveKitRoom(null)
-      setIsLiveKitConnected(false)
+    console.log('✅ Session ended, summary generated')
+  }
+
+  const endSessionWithOutcome = () => {
+    console.log('🔴 Ending voice practice session with negotiation outcome')
+    
+    // Stop all timers and recording
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current)
+      sessionTimerRef.current = null
     }
+    
+    if (turnTimerRef.current) {
+      clearInterval(turnTimerRef.current)
+      turnTimerRef.current = null
+    }
+    
+    // Stop recognition if active
+    if (recognitionRef.current && isListening) {
+      try {
+        recognitionRef.current.stop()
+      } catch (error) {
+        console.log('Recognition already stopped')
+      }
+    }
+    
+    // Calculate session time
+    const sessionTime = stopSessionTimer()
+    
+    // Generate session summary with negotiation outcome
+    const summary = generateSessionSummary(sessionTime)
+    summary.negotiationOutcome = negotiationOutcome
+    setSessionSummary(summary)
+    
+    // Reset states
+    setIsListening(false)
+    setIsHiringManagerSpeaking(false)
+    setSessionStarted(false)
+    sessionStartedRef.current = false
+    hiringManagerSpeakingRef.current = false
+    isListeningRef.current = false
+    
+    console.log('✅ Session ended with outcome:', negotiationOutcome)
   }
 
   const generateSessionSummary = (sessionTime: number) => {
@@ -2429,7 +2697,7 @@ Respond as the hiring manager would in this negotiation:`
     
     const responseQuality = userTurns.length > 0 ? (wellTimedResponses / userTurns.length) * 100 : 0
 
-    return {
+    const summary = {
       totalTime: sessionTime,
       totalTurns: conversationHistory.length,
       userTurns: userTurns.length,
@@ -2439,7 +2707,57 @@ Respond as the hiring manager would in this negotiation:`
       scenario: voiceScenario,
       averageWordsPerResponse: Math.round(avgWordsPerResponse),
       responseQuality: Math.round(responseQuality),
-      conversationHistory: conversationHistory
+      conversationHistory: conversationHistory,
+      structuredFeedback: null // Will be populated by AI analysis
+    }
+
+    // Generate structured feedback using AI
+    if (conversationHistory.length > 2) {
+      generateStructuredFeedback(conversationHistory, summary)
+    }
+
+    return summary
+  }
+
+  const generateStructuredFeedback = async (history: any[], summary: any) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [], // Not used in feedback mode
+          feedbackMode: true,
+          conversationHistory: history,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate structured feedback')
+      }
+
+      const result = await response.json()
+      
+      // Update the session summary with structured feedback
+      setSessionSummary((prev: any) => ({
+        ...prev,
+        structuredFeedback: result.feedback
+      }))
+
+    } catch (error) {
+      console.error('Error generating structured feedback:', error)
+      // Fallback to basic feedback
+      setSessionSummary((prev: any) => ({
+        ...prev,
+        structuredFeedback: {
+          strengths: ["You completed a full negotiation practice session"],
+          areasForImprovement: ["Continue practicing to build confidence"],
+          nextSteps: ["Try negotiating different aspects of the offer"],
+          overallScore: 7.0,
+          keyInsights: ["Regular practice will improve your negotiation skills"]
+        }
+      }))
     }
   }
 
@@ -2866,6 +3184,13 @@ Respond as the hiring manager would in this negotiation:`
                   <p className="text-xs text-gray-600 font-medium">Session</p>
                   <div className="flex space-x-2">
                     <button
+                      onClick={() => setShowOutcomeInput(true)}
+                      disabled={!sessionStarted}
+                      className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-xs hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      💰 Record Outcome
+                    </button>
+                    <button
                       onClick={endSession}
                       disabled={!sessionStarted}
                       className="flex-1 bg-purple-600 text-white px-3 py-2 rounded text-xs hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -2922,6 +3247,108 @@ Respond as the hiring manager would in this negotiation:`
               </div>
             </div>
 
+            {/* Negotiation Outcome */}
+            {sessionSummary.negotiationOutcome ? (
+              <div className="bg-green-50 rounded-lg p-4">
+                <h4 className="font-semibold text-green-800 mb-3">💰 Negotiation Results</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Original Offer:</span>
+                    <span className="font-medium">${sessionSummary.negotiationOutcome.originalSalary.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Final Salary:</span>
+                    <span className="font-medium">${sessionSummary.negotiationOutcome.finalSalary.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Increase:</span>
+                    <span className={`font-medium ${
+                      sessionSummary.negotiationOutcome.dollarIncrease > 0 ? 'text-green-600' : 
+                      sessionSummary.negotiationOutcome.dollarIncrease < 0 ? 'text-red-600' : 'text-gray-600'
+                    }`}>
+                      ${sessionSummary.negotiationOutcome.dollarIncrease.toLocaleString()} 
+                      ({sessionSummary.negotiationOutcome.percentIncrease > 0 ? '+' : ''}{sessionSummary.negotiationOutcome.percentIncrease}%)
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <span className={`font-medium capitalize ${
+                      sessionSummary.negotiationOutcome.negotiationStatus === 'successful' ? 'text-green-600' :
+                      sessionSummary.negotiationOutcome.negotiationStatus === 'unsuccessful' ? 'text-red-600' :
+                      'text-yellow-600'
+                    }`}>
+                      {sessionSummary.negotiationOutcome.negotiationStatus.replace('_', ' ')}
+                    </span>
+                  </div>
+                  {sessionSummary.negotiationOutcome.otherBenefits.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-green-200">
+                      <span className="text-gray-600 text-xs">Other Benefits:</span>
+                      <div className="mt-1">
+                        {sessionSummary.negotiationOutcome.otherBenefits.map((benefit: string, index: number) => (
+                          <span key={index} className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-1 mb-1">
+                            {benefit}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Communication Quality */
+              <div className="bg-green-50 rounded-lg p-4">
+                <h4 className="font-semibold text-green-800 mb-3">🎯 Communication Quality</h4>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-600">Response Timing</span>
+                      <span className="text-sm font-medium">{sessionSummary.responseQuality}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          sessionSummary.responseQuality >= 80 ? 'bg-green-500' :
+                          sessionSummary.responseQuality >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${sessionSummary.responseQuality}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Based on 15-45 second optimal response window
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Communication Quality */}
+            <div className="bg-green-50 rounded-lg p-4">
+              <h4 className="font-semibold text-green-800 mb-3">🎯 Communication Quality</h4>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-600">Response Timing</span>
+                    <span className="text-sm font-medium">{sessionSummary.responseQuality}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full ${
+                        sessionSummary.responseQuality >= 80 ? 'bg-green-500' :
+                        sessionSummary.responseQuality >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${sessionSummary.responseQuality}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Based on 15-45 second optimal response window
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Performance Insights - Enhanced with Structured Feedback */}
+          <div className="space-y-4 mb-6">
             {/* Communication Quality */}
             <div className="bg-green-50 rounded-lg p-4">
               <h4 className="font-semibold text-green-800 mb-3">🎯 Communication Quality</h4>
@@ -2963,45 +3390,135 @@ Respond as the hiring manager would in this negotiation:`
             </div>
           </div>
 
-          {/* Performance Insights */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h4 className="font-semibold text-gray-800 mb-3">💡 Performance Insights</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <h5 className="font-medium text-green-700 mb-2">✅ Strengths</h5>
-                <ul className="space-y-1 text-gray-700">
-                  {sessionSummary.averageResponseTime >= 15 && sessionSummary.averageResponseTime <= 45 && (
-                    <li>• Good response timing - professional pace</li>
+          {/* Performance Insights - Enhanced with Structured Feedback */}
+          <div className="space-y-4 mb-6">
+            {sessionSummary.structuredFeedback ? (
+              <>
+                {/* AI-Generated Structured Feedback */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-gray-800 flex items-center">
+                      🤖 AI Negotiation Analysis
+                    </h4>
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-600 mr-2">Overall Score:</span>
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        sessionSummary.structuredFeedback.overallScore >= 8 ? 'bg-green-100 text-green-800' :
+                        sessionSummary.structuredFeedback.overallScore >= 6 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {sessionSummary.structuredFeedback.overallScore}/10
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Strengths */}
+                    <div className="bg-white rounded-lg p-4 border border-green-200">
+                      <h5 className="font-semibold text-green-800 mb-3 flex items-center">
+                        ✅ What You Did Well
+                      </h5>
+                      <ul className="space-y-2">
+                        {sessionSummary.structuredFeedback.strengths.map((strength: string, index: number) => (
+                          <li key={index} className="text-sm text-gray-700 flex items-start">
+                            <span className="text-green-600 mr-2 mt-1">•</span>
+                            <span>{strength}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Areas for Improvement */}
+                    <div className="bg-white rounded-lg p-4 border border-orange-200">
+                      <h5 className="font-semibold text-orange-800 mb-3 flex items-center">
+                        🎯 Areas to Improve
+                      </h5>
+                      <ul className="space-y-2">
+                        {sessionSummary.structuredFeedback.areasForImprovement.map((improvement: string, index: number) => (
+                          <li key={index} className="text-sm text-gray-700 flex items-start">
+                            <span className="text-orange-600 mr-2 mt-1">•</span>
+                            <span>{improvement}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Next Steps */}
+                  <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
+                    <h5 className="font-semibold text-blue-800 mb-3 flex items-center">
+                      🚀 Your Next Steps
+                    </h5>
+                    <ul className="space-y-2">
+                      {sessionSummary.structuredFeedback.nextSteps.map((step: string, index: number) => (
+                        <li key={index} className="text-sm text-gray-700 flex items-start">
+                          <span className="text-blue-600 mr-2 mt-1">•</span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Key Insights */}
+                  {sessionSummary.structuredFeedback.keyInsights && sessionSummary.structuredFeedback.keyInsights.length > 0 && (
+                    <div className="mt-4 bg-white rounded-lg p-4 border border-purple-200">
+                      <h5 className="font-semibold text-purple-800 mb-3 flex items-center">
+                        💡 Key Insights
+                      </h5>
+                      <ul className="space-y-2">
+                        {sessionSummary.structuredFeedback.keyInsights.map((insight: string, index: number) => (
+                          <li key={index} className="text-sm text-gray-700 flex items-start">
+                            <span className="text-purple-600 mr-2 mt-1">•</span>
+                            <span>{insight}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
-                  {sessionSummary.averageWordsPerResponse >= 20 && (
-                    <li>• Detailed responses - good content depth</li>
-                  )}
-                  {sessionSummary.userTurns >= 3 && (
-                    <li>• Active engagement throughout session</li>
-                  )}
-                  {sessionSummary.negotiationTopics.length >= 2 && (
-                    <li>• Multi-faceted negotiation approach</li>
-                  )}
-                </ul>
+                </div>
+              </>
+            ) : (
+              /* Fallback Performance Insights */
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-800 mb-3">💡 Performance Insights</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <h5 className="font-medium text-green-700 mb-2">✅ Strengths</h5>
+                    <ul className="space-y-1 text-gray-700">
+                      {sessionSummary.averageResponseTime >= 15 && sessionSummary.averageResponseTime <= 45 && (
+                        <li>• Good response timing - professional pace</li>
+                      )}
+                      {sessionSummary.averageWordsPerResponse >= 20 && (
+                        <li>• Detailed responses - good content depth</li>
+                      )}
+                      {sessionSummary.userTurns >= 3 && (
+                        <li>• Active engagement throughout session</li>
+                      )}
+                      {sessionSummary.negotiationTopics.length >= 2 && (
+                        <li>• Multi-faceted negotiation approach</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-orange-700 mb-2">🎯 Areas for Improvement</h5>
+                    <ul className="space-y-1 text-gray-700">
+                      {sessionSummary.averageResponseTime < 15 && (
+                        <li>• Consider taking more time to formulate responses</li>
+                      )}
+                      {sessionSummary.averageResponseTime > 45 && (
+                        <li>• Try to be more concise in your responses</li>
+                      )}
+                      {sessionSummary.averageWordsPerResponse < 15 && (
+                        <li>• Provide more detailed explanations and examples</li>
+                      )}
+                      {sessionSummary.userTurns < 3 && (
+                        <li>• Engage in longer practice sessions for better results</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h5 className="font-medium text-orange-700 mb-2">🎯 Areas for Improvement</h5>
-                <ul className="space-y-1 text-gray-700">
-                  {sessionSummary.averageResponseTime < 15 && (
-                    <li>• Consider taking more time to formulate responses</li>
-                  )}
-                  {sessionSummary.averageResponseTime > 45 && (
-                    <li>• Try to be more concise in your responses</li>
-                  )}
-                  {sessionSummary.averageWordsPerResponse < 15 && (
-                    <li>• Provide more detailed explanations and examples</li>
-                  )}
-                  {sessionSummary.userTurns < 3 && (
-                    <li>• Engage in longer practice sessions for better results</li>
-                  )}
-                </ul>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Conversation Review */}
@@ -3043,6 +3560,124 @@ Respond as the hiring manager would in this negotiation:`
             >
               Start New Session
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Negotiation Outcome Input Modal */}
+      {showOutcomeInput && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Record Negotiation Outcome</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Original Salary Offer
+                </label>
+                <input
+                  type="number"
+                  value={negotiationOutcome.originalSalary}
+                  onChange={(e) => setNegotiationOutcome(prev => ({
+                    ...prev,
+                    originalSalary: Number(e.target.value)
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 75000"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Final Negotiated Salary
+                </label>
+                <input
+                  type="number"
+                  value={negotiationOutcome.finalSalary}
+                  onChange={(e) => {
+                    const finalSalary = Number(e.target.value)
+                    const originalSalary = negotiationOutcome.originalSalary
+                    const dollarIncrease = finalSalary - originalSalary
+                    const percentIncrease = originalSalary > 0 ? (dollarIncrease / originalSalary) * 100 : 0
+                    
+                    setNegotiationOutcome(prev => ({
+                      ...prev,
+                      finalSalary,
+                      dollarIncrease,
+                      percentIncrease: Math.round(percentIncrease * 100) / 100
+                    }))
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 82000"
+                />
+              </div>
+              
+              {negotiationOutcome.finalSalary !== negotiationOutcome.originalSalary && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Increase:</span>
+                      <span className="font-medium">
+                        ${negotiationOutcome.dollarIncrease.toLocaleString()} 
+                        ({negotiationOutcome.percentIncrease > 0 ? '+' : ''}{negotiationOutcome.percentIncrease}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Negotiation Status
+                </label>
+                <select
+                  value={negotiationOutcome.negotiationStatus}
+                  onChange={(e) => setNegotiationOutcome(prev => ({
+                    ...prev,
+                    negotiationStatus: e.target.value as any
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="successful">Successful - Got increase</option>
+                  <option value="unsuccessful">Unsuccessful - No increase</option>
+                  <option value="ended">Ended - Need to follow up</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Other Benefits Negotiated (optional)
+                </label>
+                <textarea
+                  value={negotiationOutcome.otherBenefits.join(', ')}
+                  onChange={(e) => setNegotiationOutcome(prev => ({
+                    ...prev,
+                    otherBenefits: e.target.value.split(',').map(b => b.trim()).filter(b => b)
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Extra vacation days, Remote work, Sign-on bonus"
+                  rows={2}
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  endSessionWithOutcome()
+                  setShowOutcomeInput(false)
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Save & End Session
+              </button>
+              <button
+                onClick={() => setShowOutcomeInput(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
