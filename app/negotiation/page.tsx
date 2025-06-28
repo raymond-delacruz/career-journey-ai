@@ -76,6 +76,69 @@ export default function NegotiationCoach() {
   const [isRecording, setIsRecording] = useState(false)
   const [currentResponse, setCurrentResponse] = useState('')
 
+  // ADD: Session Analytics State (Step 1)
+  const [sessionAnalytics, setSessionAnalytics] = useState({
+    totalFillerWords: 0,
+    responseCount: 0,
+    avgResponseTime: 0,
+    responses: [] as Array<{
+      text: string,
+      timestamp: number,
+      fillerCount: number,
+      duration: number
+    }>
+  })
+
+  // Enhanced Analysis Settings
+  const [enhancedAnalysisEnabled, setEnhancedAnalysisEnabled] = useState(true)
+
+  // ADD: Filler Word Detection Function
+  const countFillerWords = (text: string): number => {
+    const fillers = ["um", "uh", "like", "you know", "so", "actually", "basically", "literally", "i mean", "sort of", "kind of"]
+    const lowerText = text.toLowerCase()
+    return fillers.reduce((acc, word) => {
+      const regex = new RegExp(`\\b${word}\\b`, "gi")
+      const matches = lowerText.match(regex) || []
+      return acc + matches.length
+    }, 0)
+  }
+
+  // ADD: Function to Update Session Analytics
+  const updateSessionAnalytics = (userMessage: string, duration: number) => {
+    const fillerCount = countFillerWords(userMessage)
+    const timestamp = Date.now()
+    
+    setSessionAnalytics(prev => {
+      const newResponses = [...prev.responses, {
+        text: userMessage,
+        timestamp,
+        fillerCount,
+        duration
+      }]
+      
+      const newTotalFillers = prev.totalFillerWords + fillerCount
+      const newResponseCount = prev.responseCount + 1
+      const totalDuration = newResponses.reduce((sum, r) => sum + r.duration, 0)
+      const newAvgResponseTime = totalDuration / newResponseCount
+      
+      return {
+        totalFillerWords: newTotalFillers,
+        responseCount: newResponseCount,
+        avgResponseTime: newAvgResponseTime,
+        responses: newResponses
+      }
+    })
+    
+    console.log('📊 Session Analytics Updated:', {
+      message: userMessage.substring(0, 50) + '...',
+      fillerCount,
+      duration,
+      totalFillers: sessionAnalytics.totalFillerWords + fillerCount
+    })
+  }
+
+  const [currentStep, setCurrentStep] = useState(1)
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -2016,6 +2079,62 @@ function VoicePracticeMode({
     }
   }, [isVoicePracticeActive])
 
+  // Session Analytics State and Functions
+  const [sessionAnalytics, setSessionAnalytics] = useState({
+    totalFillerWords: 0,
+    responseCount: 0,
+    avgResponseTime: 0,
+    responses: [] as Array<{
+      text: string,
+      timestamp: number,
+      fillerCount: number,
+      duration: number
+    }>
+  })
+
+  const countFillerWords = (text: string): number => {
+    const fillers = ["um", "uh", "like", "you know", "so", "actually", "basically", "literally", "i mean", "sort of", "kind of"]
+    const lowerText = text.toLowerCase()
+    return fillers.reduce((acc, word) => {
+      const regex = new RegExp(`\\b${word}\\b`, "gi")
+      const matches = lowerText.match(regex) || []
+      return acc + matches.length
+    }, 0)
+  }
+
+  const updateSessionAnalytics = (userMessage: string, duration: number) => {
+    const fillerCount = countFillerWords(userMessage)
+    const timestamp = Date.now()
+    
+    setSessionAnalytics(prev => {
+      const newResponses = [...prev.responses, {
+        text: userMessage,
+        timestamp,
+        fillerCount,
+        duration
+      }]
+      
+      const newTotalFillers = prev.totalFillerWords + fillerCount
+      const newResponseCount = prev.responseCount + 1
+      const totalDuration = newResponses.reduce((sum, r) => sum + r.duration, 0)
+      const newAvgResponseTime = totalDuration / newResponseCount
+      
+      return {
+        totalFillerWords: newTotalFillers,
+        responseCount: newResponseCount,
+        avgResponseTime: newAvgResponseTime,
+        responses: newResponses
+      }
+    })
+    
+    console.log('📊 Session Analytics Updated:', {
+      message: userMessage.substring(0, 50) + '...',
+      fillerCount,
+      duration,
+      totalFillers: sessionAnalytics.totalFillerWords + fillerCount
+    })
+  }
+
   const initializeLiveKit = async () => {
     try {
       const response = await fetch(`/api/livekit-token?identity=negotiation-user-${Date.now()}&room=negotiation-practice-${Date.now()}`)
@@ -2464,6 +2583,9 @@ Keep it conversational and under 50 words.`
     
     const turnDuration = stopTurnTimer()
     
+    // ADD: Update Session Analytics with user response data
+    updateSessionAnalytics(userMessage, turnDuration)
+    
     // Add user response to conversation with timing
     const userResponse = {
       speaker: 'user' as const,
@@ -2903,6 +3025,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
   const generateStructuredFeedback = async (history: any[], summary: any) => {
     try {
       console.log('🧠 Generating structured feedback for conversation with', history.length, 'messages')
+      console.log('📊 Enhanced analysis enabled: true')
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -2913,6 +3036,7 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
           messages: [], // Not used in feedback mode
           feedbackMode: true,
           conversationHistory: history,
+          enhancedAnalysis: true, // Request enhanced analysis
         }),
       })
 
@@ -2923,12 +3047,14 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
 
       const result = await response.json()
       console.log('✅ Structured feedback received:', result.feedback)
+      console.log('📈 Analysis type:', result.analysisType)
       
       // Update the session summary with structured feedback
       setSessionSummary((prev: any) => ({
         ...prev,
         ...summary, // Include the base summary data
-        structuredFeedback: result.feedback
+        structuredFeedback: result.feedback,
+        analysisType: result.analysisType
       }))
 
     } catch (error) {
@@ -3525,6 +3651,11 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-semibold text-gray-800 flex items-center">
                       🤖 AI Negotiation Analysis
+                      {sessionSummary.analysisType === 'enhanced' && (
+                        <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full font-medium">
+                          ✨ Enhanced
+                        </span>
+                      )}
                     </h4>
                     <div className="flex items-center">
                       <span className="text-sm text-gray-600 mr-2">Overall Score:</span>
@@ -3599,6 +3730,93 @@ ${conversationHistory.slice(-3).map(h => `${h.speaker}: ${h.message}`).join('\n'
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+
+                  {/* Enhanced Analysis Summary */}
+                  {sessionSummary.analysisType === 'enhanced' && sessionSummary.structuredFeedback && (
+                    <div className="mt-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
+                      <h5 className="font-semibold text-purple-800 mb-3 flex items-center">
+                        ✨ Enhanced Analysis Summary
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Sentiment Analysis */}
+                        {sessionSummary.structuredFeedback.sentimentAnalysis && (
+                          <div className="bg-white rounded p-3">
+                            <h6 className="font-medium text-gray-800 text-sm mb-2">💭 Sentiment</h6>
+                            <div className="text-sm text-gray-600">
+                              <div className="flex justify-between items-center mb-1">
+                                <span>Overall:</span>
+                                <span className={`font-medium ${
+                                  sessionSummary.structuredFeedback.sentimentAnalysis.overallSentiment === 'positive' ? 'text-green-600' :
+                                  sessionSummary.structuredFeedback.sentimentAnalysis.overallSentiment === 'negative' ? 'text-red-600' :
+                                  'text-yellow-600'
+                                }`}>
+                                  {sessionSummary.structuredFeedback.sentimentAnalysis.overallSentiment}
+                                </span>
+                              </div>
+                              {sessionSummary.structuredFeedback.sentimentAnalysis.sentimentScore && (
+                                <div className="flex justify-between items-center">
+                                  <span>Score:</span>
+                                  <span className="font-medium">{(sessionSummary.structuredFeedback.sentimentAnalysis.sentimentScore * 10).toFixed(1)}/10</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Confidence Analysis */}
+                        {sessionSummary.structuredFeedback.confidenceAnalysis && (
+                          <div className="bg-white rounded p-3">
+                            <h6 className="font-medium text-gray-800 text-sm mb-2">🎯 Confidence</h6>
+                            <div className="text-sm text-gray-600">
+                              <div className="flex justify-between items-center mb-1">
+                                <span>Level:</span>
+                                <span className={`font-medium ${
+                                  sessionSummary.structuredFeedback.confidenceAnalysis.overallConfidence === 'high' ? 'text-green-600' :
+                                  sessionSummary.structuredFeedback.confidenceAnalysis.overallConfidence === 'low' ? 'text-red-600' :
+                                  'text-yellow-600'
+                                }`}>
+                                  {sessionSummary.structuredFeedback.confidenceAnalysis.overallConfidence}
+                                </span>
+                              </div>
+                              {sessionSummary.structuredFeedback.confidenceAnalysis.confidenceScore && (
+                                <div className="flex justify-between items-center">
+                                  <span>Score:</span>
+                                  <span className="font-medium">{(sessionSummary.structuredFeedback.confidenceAnalysis.confidenceScore * 10).toFixed(1)}/10</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Communication Style */}
+                        {sessionSummary.structuredFeedback.communicationStyle && (
+                          <div className="bg-white rounded p-3">
+                            <h6 className="font-medium text-gray-800 text-sm mb-2">🗣️ Communication</h6>
+                            <div className="text-sm text-gray-600">
+                              {sessionSummary.structuredFeedback.communicationStyle.tone && (
+                                <div className="flex justify-between items-center mb-1">
+                                  <span>Tone:</span>
+                                  <span className="font-medium">{sessionSummary.structuredFeedback.communicationStyle.tone}</span>
+                                </div>
+                              )}
+                              {sessionSummary.structuredFeedback.communicationStyle.clarity && (
+                                <div className="flex justify-between items-center mb-1">
+                                  <span>Clarity:</span>
+                                  <span className="font-medium">{(sessionSummary.structuredFeedback.communicationStyle.clarity * 10).toFixed(1)}/10</span>
+                                </div>
+                              )}
+                              {sessionSummary.structuredFeedback.communicationStyle.persuasiveness && (
+                                <div className="flex justify-between items-center">
+                                  <span>Persuasiveness:</span>
+                                  <span className="font-medium">{(sessionSummary.structuredFeedback.communicationStyle.persuasiveness * 10).toFixed(1)}/10</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

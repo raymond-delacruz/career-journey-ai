@@ -8,7 +8,7 @@ const openai = new OpenAI({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { messages, temperature = 0.7, max_tokens = 150, feedbackMode = false, conversationHistory = [], feedbackType, emailThread } = body
+    const { messages, temperature = 0.7, max_tokens = 150, feedbackMode = false, conversationHistory = [], feedbackType, emailThread, enhancedAnalysis = false } = body
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -91,7 +91,92 @@ Provide specific, actionable feedback that helps improve negotiation skills.`
     
     // Enhanced prompt for structured feedback when requested
     if (feedbackMode && conversationHistory.length > 0) {
-      const feedbackPrompt = `
+      let feedbackPrompt = ''
+      
+      if (enhancedAnalysis) {
+        // Enhanced analysis with sentiment and confidence assessment
+        feedbackPrompt = `
+You are an expert negotiation coach and communication analyst. Analyze this negotiation conversation and provide comprehensive feedback including sentiment analysis and confidence assessment.
+
+Provide feedback in the following JSON format:
+
+{
+  "strengths": [
+    "Specific thing the user did well",
+    "Another strength with concrete example"
+  ],
+  "areasForImprovement": [
+    "Specific, actionable suggestion for improvement",
+    "Another concrete improvement with how-to guidance"
+  ],
+  "nextSteps": [
+    "Concrete action to practice next time",
+    "Specific skill to develop further"
+  ],
+  "overallScore": 7.5,
+  "keyInsights": [
+    "Important negotiation insight from this conversation",
+    "Strategic observation about their approach"
+  ],
+  "sentimentAnalysis": {
+    "overallSentiment": "positive|neutral|negative",
+    "sentimentScore": 0.65,
+    "emotionalJourney": [
+      { "turn": 1, "sentiment": "nervous", "score": 0.3 },
+      { "turn": 2, "sentiment": "confident", "score": 0.7 }
+    ],
+    "emotionalInsights": [
+      "Started nervously but gained confidence",
+      "Maintained professional tone throughout"
+    ]
+  },
+  "confidenceAnalysis": {
+    "overallConfidence": "high|medium|low",
+    "confidenceScore": 0.75,
+    "confidenceIndicators": [
+      "Used decisive language",
+      "Provided specific examples",
+      "Asked clarifying questions"
+    ],
+    "confidenceGaps": [
+      "Hesitated when discussing salary numbers",
+      "Used filler words when explaining experience"
+    ],
+    "improvementSuggestions": [
+      "Practice stating salary expectations clearly",
+      "Prepare elevator pitch for experience section"
+    ]
+  },
+  "communicationStyle": {
+    "tone": "professional|assertive|collaborative|defensive",
+    "clarity": 0.8,
+    "persuasiveness": 0.7,
+    "styleStrengths": [
+      "Clear articulation of value",
+      "Good listening and responding"
+    ],
+    "styleImprovements": [
+      "Could be more assertive with requests",
+      "Add more specific examples"
+    ]
+  }
+}
+
+Conversation History:
+${conversationHistory.map((msg: any, i: number) => `Turn ${i + 1} - ${msg.speaker}: ${msg.message}`).join('\n\n')}
+
+Focus on:
+- Sentiment and emotional progression throughout the conversation
+- Confidence indicators in language choice, tone, and assertiveness
+- Communication style effectiveness
+- Specific examples from their conversation
+- Actionable advice they can implement immediately
+- Professional negotiation techniques they used well or could improve
+
+Analyze their word choice, sentence structure, hesitations, and assertiveness level. Provide insights into their emotional state and confidence level based on their communication patterns.`
+      } else {
+        // Standard feedback prompt (existing)
+        feedbackPrompt = `
 You are an expert negotiation coach. Analyze this negotiation conversation and provide structured feedback in the following JSON format:
 
 {
@@ -125,13 +210,14 @@ Focus on:
 - Communication style and effectiveness
 
 Be encouraging but honest. Provide concrete, actionable feedback that will help them improve their negotiation skills.`
+      }
 
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert negotiation coach providing structured, actionable feedback. Always respond with valid JSON format as requested.'
+            content: 'You are an expert negotiation coach and communication analyst providing structured, actionable feedback. Always respond with valid JSON format as requested.'
           },
           {
             role: 'user',
@@ -139,7 +225,7 @@ Be encouraging but honest. Provide concrete, actionable feedback that will help 
           }
         ],
         temperature: 0.3, // Lower temperature for more consistent structured output
-        max_tokens: 800,
+        max_tokens: enhancedAnalysis ? 1500 : 800, // More tokens for enhanced analysis
       })
 
       console.log('✅ Chat API: Structured feedback generated successfully')
@@ -167,19 +253,40 @@ Be encouraging but honest. Provide concrete, actionable feedback that will help 
         
         return NextResponse.json({
           feedback: structuredFeedback,
-          usage: completion.usage
+          usage: completion.usage,
+          analysisType: enhancedAnalysis ? 'enhanced' : 'standard'
         })
       } catch (parseError) {
         console.error('Failed to parse structured feedback, falling back to text:', parseError)
+        const fallbackFeedback: any = {
+          strengths: ["You engaged actively in the negotiation"],
+          areasForImprovement: ["Continue practicing to refine your approach"],
+          nextSteps: ["Try another negotiation scenario"],
+          overallScore: 7.0,
+          keyInsights: ["Keep practicing to build confidence"]
+        }
+        
+        // Add basic enhanced analysis even in fallback
+        if (enhancedAnalysis) {
+          fallbackFeedback.sentimentAnalysis = {
+            overallSentiment: "neutral",
+            sentimentScore: 0.6,
+            emotionalJourney: [],
+            emotionalInsights: ["Unable to analyze sentiment due to processing error"]
+          }
+          fallbackFeedback.confidenceAnalysis = {
+            overallConfidence: "medium",
+            confidenceScore: 0.6,
+            confidenceIndicators: ["Participated in full conversation"],
+            confidenceGaps: ["Analysis unavailable"],
+            improvementSuggestions: ["Try another session for detailed analysis"]
+          }
+        }
+        
         return NextResponse.json({
-          feedback: {
-            strengths: ["You engaged actively in the negotiation"],
-            areasForImprovement: ["Continue practicing to refine your approach"],
-            nextSteps: ["Try another negotiation scenario"],
-            overallScore: 7.0,
-            keyInsights: ["Keep practicing to build confidence"]
-          },
-          usage: completion.usage
+          feedback: fallbackFeedback,
+          usage: completion.usage,
+          analysisType: enhancedAnalysis ? 'enhanced' : 'standard'
         })
       }
     }

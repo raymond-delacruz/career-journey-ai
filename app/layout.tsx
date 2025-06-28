@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
 import FeedbackButton from './components/FeedbackButton'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'Career Journey AI',
@@ -47,6 +48,9 @@ export default function RootLayout({
         
         {/* Floating Feedback Button - appears on all pages */}
         <FeedbackButton email="careerjourneyai@gmail.com" />
+        
+        {/* Vercel Analytics */}
+        <Analytics />
       </body>
     </html>
   )
